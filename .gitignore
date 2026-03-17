@@ -1,0 +1,21 @@
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+
+# Backend
+backend/target/
+backend/*.log
+backend/.mvn-settings.xml
+
+# IDE
+.idea/
+*.iml
+
+# Claude
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
