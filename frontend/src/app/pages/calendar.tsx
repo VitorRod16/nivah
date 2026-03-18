@@ -407,11 +407,11 @@ export function Calendar() {
             week: true,
             day: true,
             agenda: true,
-          }}
+          } as any}
           messages={{
             ...messages,
-            year: 'Ano', // Label for the custom year view
-          }}
+            year: 'Ano',
+          } as any}
           view={view}
           onView={setView}
           date={date}
