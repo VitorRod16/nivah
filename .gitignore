@@ -8,6 +8,7 @@ frontend/.env.local
 backend/target/
 backend/*.log
 backend/.mvn-settings.xml
+backend/src/main/resources/application-local.properties
 
 # IDE
 .idea/

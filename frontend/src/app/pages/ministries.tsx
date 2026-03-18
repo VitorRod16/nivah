@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMockData } from "../context/MockDataContext";
 import { Card } from "../components/ui/card";
-import { Church, Plus, MapPin, Edit2, Trash2 } from "lucide-react";
+import { Church, Plus, MapPin, Edit2, Trash2, User } from "lucide-react";
 
 export function Ministries() {
   const { ministries, addMinistry, updateMinistry, deleteMinistry } = useMockData();
@@ -11,11 +11,13 @@ export function Ministries() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [city, setCity] = useState("");
+  const [pastor, setPastor] = useState("");
 
   const resetForm = () => {
     setName("");
     setDescription("");
     setCity("");
+    setPastor("");
     setEditingId(null);
     setIsAdding(false);
   };
@@ -24,6 +26,7 @@ export function Ministries() {
     setName(ministry.name);
     setDescription(ministry.description || "");
     setCity(ministry.city || "");
+    setPastor(ministry.pastor || "");
     setEditingId(ministry.id);
     setIsAdding(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -40,9 +43,9 @@ export function Ministries() {
     if (!name || !city) return;
     
     if (editingId) {
-      updateMinistry(editingId, { name, description, city });
+      updateMinistry(editingId, { name, description, city, pastor });
     } else {
-      addMinistry({ name, description, city });
+      addMinistry({ name, description, city, pastor });
     }
     resetForm();
   };
@@ -99,6 +102,17 @@ export function Ministries() {
                   placeholder="Ex: São Paulo"
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Pastor Responsável</label>
+              <input
+                type="text"
+                value={pastor}
+                onChange={(e) => setPastor(e.target.value)}
+                className="w-full px-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="Ex: Pr. João Silva"
+              />
             </div>
 
             <div className="space-y-2">
@@ -159,6 +173,12 @@ export function Ministries() {
                   <MapPin className="w-3 h-3" />
                   {ministry.city}
                 </div>
+                {ministry.pastor && (
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
+                    <User className="w-3 h-3" />
+                    {ministry.pastor}
+                  </div>
+                )}
               </div>
             </div>
             {ministry.description && (

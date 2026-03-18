@@ -1,17 +1,25 @@
 import { useState } from 'react';
 import { Outlet, Link, useLocation, Navigate } from 'react-router';
 import { Church, Users, Calendar, Crown, Mail, BookOpen, Music, Search, LogOut, Menu, X } from 'lucide-react';
-import logoImg from 'figma:asset/53ef4314c936ceb2d472946a347e2bbb419189ab.png';
+import logoImg from '../../assets/53ef4314c936ceb2d472946a347e2bbb419189ab.png';
 import { useAuth } from '../context/AuthContext';
+import { useMockData } from '../context/MockDataContext';
 
 export function Layout() {
   const location = useLocation();
   const { isAuthenticated, user, logout } = useAuth();
+  const { leaders, members } = useMockData();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
+
+  const currentMember = members.find(m => m.email === user?.email);
+  const currentLeader = currentMember ? leaders.find(l => l.memberId === currentMember.id) : null;
+  const userRoleLabel = currentLeader?.roles?.length
+    ? currentLeader.roles.join(", ")
+    : (user?.role || "Membro");
   
   const navigation = [
     { name: 'Início', href: '/', icon: Church },
@@ -51,7 +59,7 @@ export function Layout() {
                   Olá, {user?.name}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {user?.role || "Membro"}
+                  {userRoleLabel}
                 </p>
               </div>
               <button

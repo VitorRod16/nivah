@@ -23,4 +23,6 @@ public class Ministry {
     private String description;
 
     private String city;
+
+    private String pastor;
 }

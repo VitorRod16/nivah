@@ -23,4 +23,7 @@ public class Song {
     private String artist;
 
     private String link;
+
+    @Column(columnDefinition = "TEXT")
+    private String lyrics;
 }

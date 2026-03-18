@@ -1,12 +1,14 @@
 import { useState } from "react";
-import { useMockData } from "../context/MockDataContext";
+import { useMockData, Study } from "../context/MockDataContext";
 import { Card } from "../components/ui/card";
-import { BookOpen, Plus, User, AlignLeft } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog";
+import { BookOpen, Plus, User, AlignLeft, X } from "lucide-react";
 
 export function Studies() {
   const { studies, addStudy } = useMockData();
   const [isAdding, setIsAdding] = useState(false);
-  
+  const [selectedStudy, setSelectedStudy] = useState<Study | null>(null);
+
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
   const [content, setContent] = useState("");
@@ -41,7 +43,7 @@ export function Studies() {
         <Card className="p-6 border-primary/20 bg-primary/5">
           <form onSubmit={handleSubmit} className="space-y-4">
             <h2 className="text-xl font-semibold mb-4">Cadastrar Novo Estudo</h2>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Título do Estudo *</label>
@@ -96,7 +98,7 @@ export function Studies() {
         </Card>
       )}
 
-      <div className="grid md:grid-cols-2 lg:grid-cols-2 gap-6">
+      <div className="grid md:grid-cols-2 gap-6">
         {studies.map(study => (
           <Card key={study.id} className="p-6 flex flex-col h-full">
             <div className="flex items-start gap-4 mb-4">
@@ -121,8 +123,11 @@ export function Studies() {
                 {study.content}
               </p>
             </div>
-            
-            <button className="mt-4 w-full py-2 text-sm text-primary font-medium border border-primary/20 rounded-md hover:bg-primary/5 transition-colors">
+
+            <button
+              onClick={() => setSelectedStudy(study)}
+              className="mt-4 w-full py-2 text-sm text-primary font-medium border border-primary/20 rounded-md hover:bg-primary/5 transition-colors"
+            >
               Ler Estudo Completo
             </button>
           </Card>
@@ -133,6 +138,27 @@ export function Studies() {
           </div>
         )}
       </div>
+
+      <Dialog open={!!selectedStudy} onOpenChange={(open) => !open && setSelectedStudy(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">{selectedStudy?.title}</DialogTitle>
+          </DialogHeader>
+          {selectedStudy && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <User className="w-4 h-4" />
+                {selectedStudy.author || "Autor Desconhecido"}
+              </div>
+              <div className="border-t pt-4">
+                <p className="text-sm leading-relaxed whitespace-pre-line text-foreground">
+                  {selectedStudy.content}
+                </p>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

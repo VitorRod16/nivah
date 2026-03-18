@@ -6,47 +6,163 @@ import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Badge } from '../components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
-import { Mail, Send, Calendar, Clock, MapPin } from 'lucide-react';
+import { Mail, Send, Calendar, Clock, MapPin, Check, Church, Users } from 'lucide-react';
+import { useMockData } from '../context/MockDataContext';
+import type { Member } from '../context/MockDataContext';
+import { toast } from 'sonner';
 
-// Mock invitations data
-const mockInvitations = [
-  {
-    id: 1,
-    title: 'Culto de Celebração - Aniversário da Igreja',
-    recipient: 'Igreja Evangélica Comunidade',
-    date: '2026-04-20',
-    time: '19:00',
-    location: 'Av. Principal, 1000 - Centro',
-    status: 'enviado',
-    message: 'Convidamos toda a liderança e membros para celebrar conosco os 11 anos de nossa igreja.',
-    sentDate: '2026-03-05'
-  },
-  {
-    id: 2,
-    title: 'Conferência de Avivamento',
-    recipient: 'Ministério Vida Nova',
-    date: '2026-05-15',
-    time: '18:00',
-    location: 'Av. Principal, 1000 - Centro',
-    status: 'rascunho',
-    message: 'Será um prazer tê-los conosco em nossa conferência anual de avivamento.',
-    sentDate: null
-  },
-  {
-    id: 3,
-    title: 'Vigília de Oração',
-    recipient: 'Igreja Batista Central',
-    date: '2026-03-30',
-    time: '20:00',
-    location: 'Av. Principal, 1000 - Centro',
-    status: 'enviado',
-    message: 'Convidamos para nossa vigília mensal de oração e intercessão.',
-    sentDate: '2026-03-08'
-  },
-];
+type Invitation = {
+  id: number;
+  title: string;
+  date: string;
+  time: string;
+  location: string;
+  status: 'enviado' | 'rascunho';
+  message: string;
+  sentDate: string | null;
+  allMinistries: boolean;
+  ministryIds: string[];
+  recipients: Member[];
+};
 
 export function Invitations() {
-  const [invitations] = useState(mockInvitations);
+  const { ministries, events, members } = useMockData();
+  const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [open, setOpen] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+
+  // Form state
+  const [invTitle, setInvTitle] = useState('');
+  const [date, setDate] = useState('');
+  const [time, setTime] = useState('');
+  const [location, setLocation] = useState('');
+  const [message, setMessage] = useState('');
+  const [allMinistries, setAllMinistries] = useState(true);
+  const [selectedMinistries, setSelectedMinistries] = useState<string[]>([]);
+
+  const resetForm = () => {
+    setInvTitle('');
+    setDate('');
+    setTime('');
+    setLocation('');
+    setMessage('');
+    setAllMinistries(true);
+    setSelectedMinistries([]);
+  };
+
+  const getRecipients = (all: boolean, ids: string[]): Member[] => {
+    if (all) return members;
+    return members.filter(m => ids.includes(m.ministryId ?? ''));
+  };
+
+  const toggleMinistry = (id: string) => {
+    setSelectedMinistries(prev =>
+      prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectEvent = (eventId: string) => {
+    if (!eventId) return;
+    const ev = events.find(e => e.id === eventId);
+    if (!ev) return;
+    setInvTitle(ev.title);
+    setDate(ev.date.split('T')[0]);
+    setTime(ev.date.includes('T') ? ev.date.split('T')[1].slice(0, 5) : '');
+    // Auto-populate ministries from the event
+    setAllMinistries(ev.allMinistries);
+    setSelectedMinistries(ev.allMinistries ? [] : ev.ministryIds);
+  };
+
+  const buildInvitation = (status: 'enviado' | 'rascunho'): Invitation => {
+    const ids = allMinistries ? [] : selectedMinistries;
+    return {
+      id: Date.now(),
+      title: invTitle,
+      date,
+      time,
+      location,
+      status,
+      message,
+      sentDate: status === 'enviado' ? new Date().toISOString().split('T')[0] : null,
+      allMinistries,
+      ministryIds: ids,
+      recipients: getRecipients(allMinistries, ids),
+    };
+  };
+
+  const handleSaveDraft = () => {
+    if (!invTitle) { toast.error('Informe o título do evento.'); return; }
+    if (!allMinistries && selectedMinistries.length === 0) {
+      toast.error('Selecione pelo menos um ministério.');
+      return;
+    }
+    setInvitations(prev => [...prev, buildInvitation('rascunho')]);
+    toast.success('Rascunho salvo com sucesso.');
+    resetForm();
+    setOpen(false);
+  };
+
+  const handleSend = async () => {
+    if (isSending) return;
+    if (!invTitle) { toast.error('Informe o título do evento.'); return; }
+    if (!allMinistries && selectedMinistries.length === 0) {
+      toast.error('Selecione pelo menos um ministério.');
+      return;
+    }
+
+    setIsSending(true);
+    const toastId = toast.loading('Enviando convites...');
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('http://localhost:8080/api/invitations/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          title: invTitle,
+          date,
+          time,
+          location,
+          message,
+          allMinistries,
+          ministryIds: allMinistries ? [] : selectedMinistries,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erro ao enviar.');
+
+      const inv = buildInvitation('enviado');
+      setInvitations(prev => [...prev, inv]);
+      toast.success(`Convite enviado para ${data.sent} membro(s)!`, { id: toastId });
+      resetForm();
+      setOpen(false);
+    } catch (err: any) {
+      toast.error(err.message || 'Falha ao enviar convites.', { id: toastId });
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleSendDraft = (id: number) => {
+    setInvitations(prev =>
+      prev.map(i => i.id === id ? { ...i, status: 'enviado', sentDate: new Date().toISOString().split('T')[0] } : i)
+    );
+    toast.success('Convite enviado com sucesso!');
+  };
+
+  const getMinistryLabel = (inv: Invitation) => {
+    if (inv.allMinistries) return 'Todos os Ministérios';
+    return inv.ministryIds
+      .map(id => ministries.find(m => m.id === id)?.name)
+      .filter(Boolean)
+      .join(', ') || '—';
+  };
+
+  // Preview of who will receive based on current form state
+  const previewRecipients = getRecipients(allMinistries, selectedMinistries);
 
   return (
     <div className="space-y-6">
@@ -56,8 +172,8 @@ export function Invitations() {
           <h1>Cartas Convite</h1>
           <p className="text-muted-foreground">Envie convites para outros ministérios e igrejas</p>
         </div>
-        
-        <Dialog>
+
+        <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm(); }}>
           <DialogTrigger asChild>
             <Button>
               <Send className="w-4 h-4 mr-2" />
@@ -68,53 +184,140 @@ export function Invitations() {
             <DialogHeader>
               <DialogTitle>Criar Nova Carta Convite</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto">
+            <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-1">
+
+              {/* Import from calendar event */}
+              {events.filter(e => !e.cancelled).length > 0 && (
+                <div className="space-y-2">
+                  <Label>Importar de um Evento do Calendário</Label>
+                  <select
+                    onChange={(e) => handleSelectEvent(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                    defaultValue=""
+                  >
+                    <option value="">Selecionar evento (opcional)</option>
+                    {events.filter(e => !e.cancelled).map(e => (
+                      <option key={e.id} value={e.id}>
+                        {e.title} — {new Date(e.date + (e.date.includes('T') ? '' : 'T00:00:00')).toLocaleDateString('pt-BR')}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-muted-foreground">Ao selecionar um evento, o título, data e ministérios são preenchidos automaticamente.</p>
+                </div>
+              )}
+
               <div className="space-y-2">
-                <Label htmlFor="invite-title">Título do Evento</Label>
-                <Input id="invite-title" placeholder="Ex: Conferência de Avivamento" />
+                <Label htmlFor="invite-title">Título do Evento *</Label>
+                <Input
+                  id="invite-title"
+                  value={invTitle}
+                  onChange={e => setInvTitle(e.target.value)}
+                  placeholder="Ex: Conferência de Avivamento"
+                />
               </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="invite-recipient">Destinatário (Igreja/Ministério)</Label>
-                <Input id="invite-recipient" placeholder="Nome da igreja ou ministério" />
+
+              {/* Ministry selection — identical to calendar */}
+              <div className="space-y-3">
+                <Label>Ministérios Envolvidos</Label>
+
+                <label className={`flex w-fit items-center gap-3 p-3 border rounded-md cursor-pointer transition-colors ${allMinistries ? 'bg-primary/10 border-primary' : 'bg-background hover:bg-accent'}`}>
+                  <input
+                    type="checkbox"
+                    checked={allMinistries}
+                    onChange={(e) => {
+                      setAllMinistries(e.target.checked);
+                      if (e.target.checked) setSelectedMinistries([]);
+                    }}
+                    className="sr-only"
+                  />
+                  <div className={`w-5 h-5 flex items-center justify-center border rounded ${allMinistries ? 'bg-primary border-primary' : 'border-input'}`}>
+                    {allMinistries && <Check className="w-3 h-3 text-primary-foreground" />}
+                  </div>
+                  <span className="text-sm font-medium">Envolve todos os ministérios</span>
+                </label>
+
+                {!allMinistries && (
+                  <div className="space-y-3 pt-2 pl-4 border-l-2 border-primary/20">
+                    <p className="text-sm font-medium">Selecione os ministérios envolvidos *</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {ministries.map(ministry => (
+                        <label
+                          key={ministry.id}
+                          className={`flex items-center gap-3 p-3 border rounded-md cursor-pointer transition-colors ${
+                            selectedMinistries.includes(ministry.id) ? 'bg-primary/10 border-primary' : 'bg-background hover:bg-accent'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedMinistries.includes(ministry.id)}
+                            onChange={() => toggleMinistry(ministry.id)}
+                            className="sr-only"
+                          />
+                          <div className={`w-5 h-5 flex items-center justify-center border rounded shrink-0 ${
+                            selectedMinistries.includes(ministry.id) ? 'bg-primary border-primary' : 'border-input'
+                          }`}>
+                            {selectedMinistries.includes(ministry.id) && <Check className="w-3 h-3 text-primary-foreground" />}
+                          </div>
+                          <span className="text-sm font-medium">{ministry.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                    {ministries.length === 0 && (
+                      <p className="text-sm text-muted-foreground">Nenhum ministério cadastrado.</p>
+                    )}
+                  </div>
+                )}
               </div>
-              
+
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="invite-date">Data do Evento</Label>
-                  <Input id="invite-date" type="date" />
+                  <Input id="invite-date" type="date" value={date} onChange={e => setDate(e.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="invite-time">Horário</Label>
-                  <Input id="invite-time" type="time" />
+                  <Input id="invite-time" type="time" value={time} onChange={e => setTime(e.target.value)} />
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="invite-location">Local</Label>
-                <Input id="invite-location" placeholder="Endereço do evento" />
+                <Input id="invite-location" value={location} onChange={e => setLocation(e.target.value)} placeholder="Endereço do evento" />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="invite-message">Mensagem do Convite</Label>
-                <Textarea 
-                  id="invite-message" 
+                <Textarea
+                  id="invite-message"
+                  value={message}
+                  onChange={e => setMessage(e.target.value)}
                   placeholder="Escreva a mensagem do convite..."
-                  rows={6}
+                  rows={5}
                 />
               </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="invite-email">E-mail do Destinatário</Label>
-                <Input id="invite-email" type="email" placeholder="contato@igreja.com" />
+
+              {/* Recipients preview */}
+              <div className="p-3 bg-muted/50 rounded-md space-y-1">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <Users className="w-4 h-4 text-primary" />
+                  {previewRecipients.length === 0
+                    ? 'Nenhum membro encontrado para os ministérios selecionados'
+                    : `${previewRecipients.length} membro(s) receberão este convite`}
+                </div>
+                {previewRecipients.length > 0 && (
+                  <p className="text-xs text-muted-foreground pl-6">
+                    {previewRecipients.slice(0, 5).map(m => m.name).join(', ')}
+                    {previewRecipients.length > 5 ? ` e mais ${previewRecipients.length - 5}...` : ''}
+                  </p>
+                )}
               </div>
-              
-              <div className="flex gap-2">
-                <Button className="flex-1">
+
+              <div className="flex gap-2 pt-2">
+                <Button className="flex-1" onClick={handleSend} disabled={isSending}>
                   <Send className="w-4 h-4 mr-2" />
-                  Enviar Convite
+                  {isSending ? 'Enviando...' : 'Enviar Convite'}
                 </Button>
-                <Button variant="outline" className="flex-1">
+                <Button variant="outline" className="flex-1" onClick={handleSaveDraft}>
                   Salvar Rascunho
                 </Button>
               </div>
@@ -139,7 +342,7 @@ export function Invitations() {
         </Card>
         <Card className="p-4">
           <p className="text-sm text-muted-foreground">Este Mês</p>
-          <p className="text-2xl mt-1">3</p>
+          <p className="text-2xl mt-1">{invitations.filter(i => i.sentDate && new Date(i.sentDate).getMonth() === new Date().getMonth()).length}</p>
         </Card>
       </div>
 
@@ -156,14 +359,24 @@ export function Invitations() {
                       {invitation.status === 'enviado' ? 'Enviado' : 'Rascunho'}
                     </Badge>
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    Destinatário: {invitation.recipient}
-                  </p>
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                    <Church className="w-3 h-3" />
+                    {getMinistryLabel(invitation)}
+                  </div>
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                    <Users className="w-3 h-3" />
+                    {invitation.recipients.length} membro(s)
+                    {invitation.recipients.length > 0 && (
+                      <span className="ml-1">
+                        — {invitation.recipients.slice(0, 3).map(m => m.name).join(', ')}
+                        {invitation.recipients.length > 3 ? ` e mais ${invitation.recipients.length - 3}` : ''}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm">Editar</Button>
                   {invitation.status === 'rascunho' && (
-                    <Button size="sm">
+                    <Button size="sm" onClick={() => handleSendDraft(invitation.id)}>
                       <Send className="w-4 h-4 mr-1" />
                       Enviar
                     </Button>
@@ -171,23 +384,31 @@ export function Invitations() {
                 </div>
               </div>
 
-              <div className="p-4 bg-muted/50 rounded-lg space-y-2">
-                <p className="text-sm">{invitation.message}</p>
-              </div>
+              {invitation.message && (
+                <div className="p-4 bg-muted/50 rounded-lg">
+                  <p className="text-sm">{invitation.message}</p>
+                </div>
+              )}
 
-              <div className="grid sm:grid-cols-3 gap-3 text-sm">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Calendar className="w-4 h-4" />
-                  <span>{new Date(invitation.date + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
-                </div>
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Clock className="w-4 h-4" />
-                  <span>{invitation.time}</span>
-                </div>
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <MapPin className="w-4 h-4" />
-                  <span className="truncate">{invitation.location}</span>
-                </div>
+              <div className="flex flex-wrap gap-4 text-sm">
+                {invitation.date && (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Calendar className="w-4 h-4" />
+                    <span>{new Date(invitation.date + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
+                  </div>
+                )}
+                {invitation.time && (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Clock className="w-4 h-4" />
+                    <span>{invitation.time}</span>
+                  </div>
+                )}
+                {invitation.location && (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <MapPin className="w-4 h-4" />
+                    <span className="truncate">{invitation.location}</span>
+                  </div>
+                )}
               </div>
 
               {invitation.sentDate && (
@@ -199,9 +420,18 @@ export function Invitations() {
             </div>
           </Card>
         ))}
+        {invitations.length === 0 && (
+          <Card className="p-12">
+            <div className="text-center space-y-2 text-muted-foreground">
+              <Mail className="w-12 h-12 mx-auto opacity-40" />
+              <p>Nenhuma carta convite criada ainda.</p>
+              <p className="text-sm">Clique em "Nova Carta Convite" para começar.</p>
+            </div>
+          </Card>
+        )}
       </div>
 
-      {/* Template Info */}
+      {/* Info */}
       <Card className="p-6 bg-primary/5 border-primary/20">
         <div className="flex gap-4 items-start">
           <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -210,9 +440,9 @@ export function Invitations() {
           <div className="flex-1 space-y-2">
             <h3>Sobre as Cartas Convite</h3>
             <p className="text-sm text-muted-foreground">
-              Use esta ferramenta para criar e enviar convites formais para outras igrejas e ministérios. 
-              Você pode personalizar cada convite com os detalhes do evento, mensagem especial e 
-              informações de contato. Os convites podem ser salvos como rascunho e enviados posteriormente.
+              Crie convites para os membros dos ministérios envolvidos em um evento. Importe um evento
+              do calendário para preencher automaticamente os dados e os ministérios. O convite é
+              enviado para todos os membros vinculados aos ministérios selecionados.
             </p>
           </div>
         </div>

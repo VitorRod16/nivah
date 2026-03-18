@@ -1,7 +1,8 @@
 import { useState, useMemo } from "react";
 import { useMockData } from "../context/MockDataContext";
 import { Card } from "../components/ui/card";
-import { Calendar as CalendarIcon, Plus, Clock, Info, Check, Church } from "lucide-react";
+import { Calendar as CalendarIcon, Plus, Clock, Info, Check, Church, XCircle } from "lucide-react";
+import { toast } from "sonner";
 import { Calendar as BigCalendar, dateFnsLocalizer, Views, Event as CalendarEvent } from 'react-big-calendar';
 import { format, parse, startOfWeek, getDay, isSameMonth, isSameYear } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
@@ -80,7 +81,7 @@ YearView.navigate = (date: Date, action: string) => {
 };
 
 export function Calendar() {
-  const { events, addEvent, ministries } = useMockData();
+  const { events, addEvent, updateEvent, ministries } = useMockData();
   const [isAdding, setIsAdding] = useState(false);
   const [view, setView] = useState<any>(Views.MONTH);
   const [date, setDate] = useState(new Date());
@@ -93,6 +94,13 @@ export function Calendar() {
   const [allMinistries, setAllMinistries] = useState(true);
   const [selectedMinistries, setSelectedMinistries] = useState<string[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
+
+  const handleCancelEvent = async (eventId: string, eventTitle: string) => {
+    if (!confirm(`Deseja cancelar o evento "${eventTitle}"?`)) return;
+    await updateEvent(eventId, { cancelled: true });
+    toast.warning(`Evento "${eventTitle}" foi cancelado.`);
+    setSelectedEvent(null);
+  };
 
   const toggleMinistry = (id: string) => {
     setSelectedMinistries(prev => 
@@ -128,20 +136,21 @@ export function Calendar() {
     setIsAdding(false);
   };
 
-  // Convert MockData events to react-big-calendar events
+  // Convert MockData events to react-big-calendar events (exclude cancelled)
   const calendarEvents = useMemo(() => {
-    return events.map(e => {
-      const start = new Date(e.date);
-      // Use endDate se estiver disponível, caso contrário, use um padrão de 2 horas.
-      const end = e.endDate ? new Date(e.endDate) : new Date(start.getTime() + 2 * 60 * 60 * 1000); 
-      return {
-        id: e.id,
-        title: e.title,
-        start,
-        end,
-        resource: e
-      };
-    });
+    return events
+      .filter(e => !e.cancelled)
+      .map(e => {
+        const start = new Date(e.date);
+        const end = e.endDate ? new Date(e.endDate) : new Date(start.getTime() + 2 * 60 * 60 * 1000);
+        return {
+          id: e.id,
+          title: e.title,
+          start,
+          end,
+          resource: e
+        };
+      });
   }, [events]);
 
   const messages = {
@@ -348,6 +357,15 @@ export function Calendar() {
                   <p className="text-sm">{selectedEvent.resource.description}</p>
                 </div>
               )}
+              <div className="mt-4 pt-2">
+                <button
+                  onClick={() => handleCancelEvent(selectedEvent.resource.id, selectedEvent.title)}
+                  className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-destructive border border-destructive/30 rounded-md hover:bg-destructive/10 transition-colors"
+                >
+                  <XCircle className="w-4 h-4" />
+                  Cancelar Evento
+                </button>
+              </div>
             </div>
           </div>
         </Card>

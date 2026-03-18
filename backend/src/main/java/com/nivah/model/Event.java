@@ -30,8 +30,12 @@ public class Event {
     private String description;
 
     @Builder.Default
-    @Column(nullable = false)
+    @Column(columnDefinition = "boolean default false")
     private boolean allMinistries = false;
+
+    @Builder.Default
+    @Column(columnDefinition = "boolean default false")
+    private boolean cancelled = false;
 
     @Builder.Default
     @ElementCollection

@@ -19,7 +19,7 @@ import { Loader2 } from "lucide-react";
 
 function AuthLoader({ children }: { children: React.ReactNode }) {
   const { isLoadingAuth } = useAuth();
-  
+
   if (isLoadingAuth) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -27,18 +27,16 @@ function AuthLoader({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-  
+
   return <>{children}</>;
 }
 
 export function RootProvider() {
   return (
     <AuthProvider>
-      <MockDataProvider>
-        <AuthLoader>
-          <Outlet />
-        </AuthLoader>
-      </MockDataProvider>
+      <AuthLoader>
+        <Outlet />
+      </AuthLoader>
     </AuthProvider>
   );
 }
@@ -53,7 +51,11 @@ export const router = createBrowserRouter([
         Component: Login,
       },
       {
-        Component: Layout,
+        element: (
+          <MockDataProvider>
+            <Layout />
+          </MockDataProvider>
+        ),
         children: [
           { index: true, Component: Home },
           { path: "members", Component: Members },

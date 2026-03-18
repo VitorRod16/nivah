@@ -1,37 +1,56 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
-import { useMockData } from "../context/MockDataContext";
 import { Navigate } from "react-router";
 import { Card } from "../components/ui/card";
-import { Church, Lock, Mail, User, Building, Search, CheckCircle2, ArrowRight, Plus } from "lucide-react";
-import logoImg from "figma:asset/53ef4314c936ceb2d472946a347e2bbb419189ab.png";
+import { Church, Lock, Mail, User, Building, Search, CheckCircle2, ArrowRight, Plus, Eye, EyeOff, Phone } from "lucide-react";
+import logoImg from "../../assets/53ef4314c936ceb2d472946a347e2bbb419189ab.png";
+import { toast } from "sonner";
+
+const BASE_URL = "http://localhost:8080/api";
+
+type MinistryOption = { id: string; name: string; city: string; isPending?: boolean };
 
 export function Login() {
-  const { login, register, isAuthenticated } = useAuth();
-  const { ministries, addMinistry, addMember } = useMockData();
-  
+  const { login, register, finalizeAuth, isAuthenticated } = useAuth();
+
   const [isRegistering, setIsRegistering] = useState(false);
   const [isSelectingMinistry, setIsSelectingMinistry] = useState(false);
   const [isAddingNewMinistry, setIsAddingNewMinistry] = useState(false);
-  
+
   // Login states
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  
+
   // Register states
   const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  
-  // Ministry Selection states
+
+  // Password visibility
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Ministry states (loaded directly, no context needed)
+  const [ministries, setMinistries] = useState<MinistryOption[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedMinistries, setSelectedMinistries] = useState<string[]>([]);
-  
-  // New Ministry states
+  // Pending new ministry is deferred: created after registration (when we have a token)
+  const [pendingNewMinistry, setPendingNewMinistry] = useState<{ name: string; city: string } | null>(null);
+
+  // New Ministry form states
   const [newMinistryName, setNewMinistryName] = useState("");
   const [newMinistryCity, setNewMinistryCity] = useState("");
-  
-  const [error, setError] = useState("");
-  const [successMsg, setSuccessMsg] = useState("");
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Load existing ministries when entering the ministry selection step (endpoint is public)
+  useEffect(() => {
+    if (!isSelectingMinistry) return;
+    fetch(`${BASE_URL}/ministries`)
+      .then(r => (r.ok ? r.json() : []))
+      .then(setMinistries)
+      .catch(() => setMinistries([]));
+  }, [isSelectingMinistry]);
 
   if (isAuthenticated) {
     return <Navigate to="/" replace />;
@@ -39,77 +58,113 @@ export function Login() {
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
 
     if (!email || !password) {
-      setError("Por favor, preencha todos os campos.");
+      toast.error("Por favor, preencha todos os campos.");
       return;
     }
 
+    setIsSubmitting(true);
     const result = await login(email, password);
+    setIsSubmitting(false);
+
     if (!result.success) {
-      setError(result.error || "Erro ao fazer login");
+      toast.error(result.error || "Erro ao fazer login");
     }
   };
 
   const handleRegisterPersonSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
 
     if (!name || !email || !password || !confirmPassword) {
-      setError("Por favor, preencha todos os campos.");
+      toast.error("Por favor, preencha todos os campos.");
       return;
     }
 
     if (password !== confirmPassword) {
-      setError("As senhas não coincidem.");
+      toast.error("As senhas não coincidem.");
       return;
     }
 
-    // Move to ministry selection step
     setIsSelectingMinistry(true);
   };
 
   const handleFinishRegistration = async () => {
     if (selectedMinistries.length === 0) {
-      setError("Selecione pelo menos um ministério para se vincular.");
+      toast.error("Selecione pelo menos um ministério para se vincular.");
       return;
     }
 
-    setError("");
-    setSuccessMsg("Criando conta e vinculando aos ministérios...");
-    
-    // Save the new user correctly using the context's register function
+    setIsSubmitting(true);
+    const toastId = toast.loading("Criando conta e vinculando ao ministério...");
+
+    // register() now returns token + userData WITHOUT triggering navigation yet.
+    // This lets us finish creating ministry/member before MockDataProvider loads.
     const result = await register(name, email, password);
-    
-    if (result && !result.success) {
-      setError(result.error || "Erro ao criar conta.");
-      setSuccessMsg("");
+    if (!result.success) {
+      toast.error(result.error || "Erro ao criar conta.", { id: toastId });
+      setIsSubmitting(false);
       return;
     }
-    
-    // Auto-create as Member
-    addMember({
-      name: name,
-      email: email,
-      phone: "",
-      ministryId: selectedMinistries[0] // pick the first one
-    });
 
-    setSuccessMsg("Conta criada e vinculada com sucesso! Redirecionando...");
+    const { token, userData } = result;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+
+    // Determine the ministry ID to link the member to
+    let ministryId = selectedMinistries[0];
+
+    // If there's a pending new ministry (created before auth), create it now
+    if (pendingNewMinistry && ministryId === "pending-new") {
+      try {
+        const res = await fetch(`${BASE_URL}/ministries`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            name: pendingNewMinistry.name,
+            city: pendingNewMinistry.city,
+            description: "Cadastrado via formulário de registro",
+          }),
+        });
+        const created = await res.json();
+        ministryId = created.id;
+      } catch {
+        ministryId = "";
+      }
+    }
+
+    // Create the member record linked to the chosen ministry
+    try {
+      await fetch(`${BASE_URL}/members`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ name, email, phone, ministryId: ministryId || undefined }),
+      });
+    } catch {
+      // Non-critical — user account was created successfully
+    }
+
+    toast.success("Conta criada com sucesso! Bem-vindo ao Nivah.", { id: toastId });
+    setIsSubmitting(false);
+
+    // Only NOW trigger navigation — ministry and member are already in the DB,
+    // so when MockDataProvider loads its data everything will be visible.
+    finalizeAuth(userData!, token!);
   };
 
   const handleAddNewMinistry = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMinistryName) return;
-    
-    const newId = addMinistry({
-      name: newMinistryName,
-      city: newMinistryCity,
-      description: "Cadastrado via formulário de registro"
-    });
-    
-    setSelectedMinistries(prev => [...prev, newId]);
+    if (!newMinistryName || !newMinistryCity) return;
+
+    // Store the data locally — the ministry will be created after registration (needs auth token)
+    const tempId = "pending-new";
+    setPendingNewMinistry({ name: newMinistryName, city: newMinistryCity });
+    setMinistries(prev => [
+      ...prev.filter(m => m.id !== tempId),
+      { id: tempId, name: newMinistryName, city: newMinistryCity, isPending: true },
+    ]);
+    setSelectedMinistries(prev => [...prev.filter(id => id !== tempId), tempId]);
+    setNewMinistryName("");
+    setNewMinistryCity("");
     setIsAddingNewMinistry(false);
     setSearchQuery("");
   };
@@ -151,18 +206,6 @@ export function Login() {
         </div>
 
         <Card className="p-8 border-primary/20 shadow-lg relative overflow-hidden">
-          {successMsg && (
-            <div className="mb-6 p-3 bg-green-100 border border-green-300 text-green-800 text-sm rounded-md text-center font-medium">
-              {successMsg}
-            </div>
-          )}
-          
-          {error && (
-            <div className="mb-6 p-3 bg-red-100 border border-red-300 text-red-700 text-sm rounded-md text-center">
-              {error}
-            </div>
-          )}
-
           {!isRegistering && !isSelectingMinistry && (
             // Login Form
             <form onSubmit={handleLoginSubmit} className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
@@ -194,20 +237,28 @@ export function Login() {
                     <Lock className="h-5 w-5 text-muted-foreground" />
                   </div>
                   <input
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-10 pr-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary transition-shadow"
+                    className="w-full pl-10 pr-10 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary transition-shadow"
                     placeholder="••••••••"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(v => !v)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-muted-foreground hover:text-foreground"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
                 </div>
               </div>
 
               <button
                 type="submit"
-                className="w-full py-2.5 px-4 bg-[#0000FF] text-white rounded-md hover:bg-[#0000CC] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0000FF] font-medium transition-colors flex items-center justify-center gap-2"
+                disabled={isSubmitting}
+                className="w-full py-2.5 px-4 bg-[#0000FF] text-white rounded-md hover:bg-[#0000CC] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0000FF] font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Entrar
+                {isSubmitting ? "Entrando..." : "Entrar"}
               </button>
             </form>
           )}
@@ -247,6 +298,22 @@ export function Login() {
                 </div>
               </div>
 
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Telefone</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Phone className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="w-full pl-10 pr-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary transition-shadow"
+                    placeholder="(11) 99999-9999"
+                  />
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Senha</label>
@@ -255,12 +322,19 @@ export function Login() {
                       <Lock className="h-5 w-5 text-muted-foreground" />
                     </div>
                     <input
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full pl-10 pr-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary transition-shadow"
+                      className="w-full pl-10 pr-10 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary transition-shadow"
                       placeholder="••••••••"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(v => !v)}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-muted-foreground hover:text-foreground"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
                   </div>
                 </div>
 
@@ -271,12 +345,19 @@ export function Login() {
                       <Lock className="h-5 w-5 text-muted-foreground" />
                     </div>
                     <input
-                      type="password"
+                      type={showConfirmPassword ? "text" : "password"}
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="w-full pl-10 pr-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary transition-shadow"
+                      className="w-full pl-10 pr-10 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary transition-shadow"
                       placeholder="••••••••"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(v => !v)}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-muted-foreground hover:text-foreground"
+                    >
+                      {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
                   </div>
                 </div>
               </div>
@@ -360,10 +441,10 @@ export function Login() {
                     <button
                       type="button"
                       onClick={handleFinishRegistration}
-                      disabled={selectedMinistries.length === 0 || !!successMsg}
+                      disabled={selectedMinistries.length === 0 || isSubmitting}
                       className="flex-1 py-2.5 px-4 bg-[#0000FF] text-white rounded-md hover:bg-[#0000CC] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0000FF] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                     >
-                      Finalizar Cadastro
+                      {isSubmitting ? "Criando conta..." : "Finalizar Cadastro"}
                     </button>
                   </div>
                 </>
@@ -428,11 +509,8 @@ export function Login() {
               {!isRegistering ? (
                 <>
                   Não tem uma conta?{" "}
-                  <button 
-                    onClick={() => {
-                      setIsRegistering(true);
-                      setError("");
-                    }} 
+                  <button
+                    onClick={() => setIsRegistering(true)}
                     className="text-primary font-medium hover:underline focus:outline-none"
                   >
                     Cadastre-se
@@ -441,11 +519,8 @@ export function Login() {
               ) : (
                 <>
                   Já possui uma conta?{" "}
-                  <button 
-                    onClick={() => {
-                      setIsRegistering(false);
-                      setError("");
-                    }} 
+                  <button
+                    onClick={() => setIsRegistering(false)}
                     className="text-primary font-medium hover:underline focus:outline-none"
                   >
                     Fazer login

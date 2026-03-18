@@ -1,19 +1,20 @@
 import { useState } from "react";
 import { useMockData } from "../context/MockDataContext";
 import { Card } from "../components/ui/card";
-import { Crown, Plus, Check, ChevronDown, Award, Users, Church } from "lucide-react";
+import { Crown, Plus, Check, Award, Users, Church, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 export function Leadership() {
-  const { leaders, addLeader, members, ministries } = useMockData();
+  const { leaders, addLeader, deleteLeader, members, ministries } = useMockData();
   const [isAdding, setIsAdding] = useState(false);
-  
+
   const [memberId, setMemberId] = useState("");
   const [roleInput, setRoleInput] = useState("");
   const [roles, setRoles] = useState<string[]>([]);
   const [selectedMinistries, setSelectedMinistries] = useState<string[]>([]);
 
   const toggleMinistry = (id: string) => {
-    setSelectedMinistries(prev => 
+    setSelectedMinistries(prev =>
       prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]
     );
   };
@@ -39,6 +40,15 @@ export function Leadership() {
     setIsAdding(false);
   };
 
+  const handleDelete = async (leaderId: string, leaderMemberId: string) => {
+    const memberLeadershipCount = leaders.filter(l => l.memberId === leaderMemberId).length;
+    await deleteLeader(leaderId);
+    if (memberLeadershipCount <= 1) {
+      const member = members.find(m => m.id === leaderMemberId);
+      toast.info(`${member?.name || "Membro"} revertido para Membro.`);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -59,7 +69,7 @@ export function Leadership() {
         <Card className="p-6 border-primary/20 bg-primary/5">
           <form onSubmit={handleSubmit} className="space-y-6">
             <h2 className="text-xl font-semibold mb-4">Cadastrar Novo Líder</h2>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Membro *</label>
@@ -75,7 +85,7 @@ export function Leadership() {
                   ))}
                 </select>
               </div>
-              
+
               <div className="space-y-2">
                 <label className="text-sm font-medium">Papéis (ex: Músico, Pastor, Tesoureiro) *</label>
                 <div className="flex gap-2">
@@ -163,7 +173,15 @@ export function Leadership() {
           if (!member) return null;
 
           return (
-            <Card key={leader.id} className="p-6">
+            <Card key={leader.id} className="p-6 relative group">
+              <button
+                onClick={() => handleDelete(leader.id, leader.memberId)}
+                className="absolute top-4 right-4 p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors opacity-0 group-hover:opacity-100"
+                title="Excluir liderança"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+
               <div className="flex items-center gap-4 mb-4">
                 <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                   <Crown className="w-6 h-6 text-primary" />

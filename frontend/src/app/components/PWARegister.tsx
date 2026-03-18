@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import logoImg from 'figma:asset/53ef4314c936ceb2d472946a347e2bbb419189ab.png';
+import logoImg from '../../assets/53ef4314c936ceb2d472946a347e2bbb419189ab.png';
 import { Download, X, Share } from 'lucide-react';
 
 export function PWARegister() {
@@ -126,11 +126,13 @@ export function PWARegister() {
       return () => {
         clearTimeout(timer);
         window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+        URL.revokeObjectURL(manifestURL);
       };
     }
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      URL.revokeObjectURL(manifestURL);
     };
   }, []);
 

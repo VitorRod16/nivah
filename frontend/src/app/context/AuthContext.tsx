@@ -11,7 +11,8 @@ type AuthContextType = {
   user: User | null;
   isAuthenticated: boolean;
   login: (email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
-  register: (name: string, email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
+  register: (name: string, email: string, password?: string) => Promise<{ success: boolean; error?: string; token?: string; userData?: User }>;
+  finalizeAuth: (user: User, token: string) => void;
   logout: () => Promise<void>;
   isLoadingAuth: boolean;
 };
@@ -80,12 +81,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         else if (errorMsg.includes("password")) errorMsg = "A senha deve ter no mínimo 6 caracteres.";
         return { success: false, error: errorMsg };
       }
-      localStorage.setItem("token", data.token);
-      setUser({ id: data.id, name: data.name, email: data.email, role: data.role });
-      return { success: true };
+      // Return token and user data WITHOUT setting auth state yet.
+      // The caller is responsible for calling finalizeAuth() after any
+      // post-registration setup (e.g. creating ministry/member) is complete.
+      const userData: User = { id: data.id, name: data.name, email: data.email, role: data.role };
+      return { success: true, token: data.token, userData };
     } catch (err: any) {
       return { success: false, error: err.message };
     }
+  };
+
+  const finalizeAuth = (user: User, token: string) => {
+    localStorage.setItem("token", token);
+    setUser(user);
   };
 
   const logout = async () => {
@@ -94,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, register, logout, isLoadingAuth }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, register, finalizeAuth, logout, isLoadingAuth }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'niva-cache-v1';
+const CACHE_NAME = 'niva-cache-v2';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -53,8 +53,16 @@ self.addEventListener('fetch', event => {
 
             caches.open(CACHE_NAME)
               .then(function(cache) {
-                // Don't cache API calls or extension requests
-                if (!event.request.url.startsWith('http') || event.request.method !== 'GET') return;
+                const url = event.request.url;
+                // Only cache same-origin static assets, never API calls or JS modules
+                if (
+                  !url.startsWith(self.location.origin) ||
+                  event.request.method !== 'GET' ||
+                  url.includes('/api/') ||
+                  url.includes('.js') ||
+                  url.includes('.ts') ||
+                  url.includes('?')
+                ) return;
                 cache.put(event.request, responseToCache);
               });
 

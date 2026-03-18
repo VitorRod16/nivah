@@ -10,6 +10,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
@@ -18,9 +20,13 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/signup")
-    public ResponseEntity<AuthResponse> signup(@RequestBody SignupRequest request) {
-        AuthResponse response = authService.signup(request);
-        return ResponseEntity.ok(response);
+    public ResponseEntity<?> signup(@RequestBody SignupRequest request) {
+        try {
+            AuthResponse response = authService.signup(request);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
     }
 
     @PostMapping("/login")

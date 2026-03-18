@@ -1,85 +1,34 @@
-import { Users, Calendar, DollarSign, BookOpen, TrendingUp, Clock } from "lucide-react";
-
-const stats = [
-  {
-    title: "Total Members",
-    value: "384",
-    change: "+12 this month",
-    icon: Users,
-    color: "bg-primary",
-  },
-  {
-    title: "Next Event",
-    value: "Youth Service",
-    change: "March 12, 2026 - 6:00 PM",
-    icon: Calendar,
-    color: "bg-accent",
-  },
-  {
-    title: "Monthly Offerings",
-    value: "$12,450",
-    change: "+8% from last month",
-    icon: DollarSign,
-    color: "bg-green-500",
-  },
-  {
-    title: "Available Studies",
-    value: "28",
-    change: "3 new this week",
-    icon: BookOpen,
-    color: "bg-blue-500",
-  },
-];
-
-const upcomingEvents = [
-  {
-    id: 1,
-    title: "Sunday Worship Service",
-    date: "March 10, 2026",
-    time: "10:00 AM",
-    attendees: 250,
-  },
-  {
-    id: 2,
-    title: "Youth Service",
-    date: "March 12, 2026",
-    time: "6:00 PM",
-    attendees: 85,
-  },
-  {
-    id: 3,
-    title: "Bible Study - Book of James",
-    date: "March 13, 2026",
-    time: "7:00 PM",
-    attendees: 42,
-  },
-  {
-    id: 4,
-    title: "Prayer Meeting",
-    date: "March 15, 2026",
-    time: "6:30 AM",
-    attendees: 35,
-  },
-  {
-    id: 5,
-    title: "Choir Practice",
-    date: "March 16, 2026",
-    time: "5:00 PM",
-    attendees: 28,
-  },
-];
+import { Users, Calendar, BookOpen, Music, Church, Clock } from "lucide-react";
+import { useMockData } from "../context/MockDataContext";
+import { useAuth } from "../context/AuthContext";
 
 export function Dashboard() {
+  const { members, ministries, events, studies, songs } = useMockData();
+  const { user } = useAuth();
+
+  const todayTime = Date.now();
+  const upcomingEvents = events
+    .filter(e => new Date(e.date).getTime() >= todayTime)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(0, 5);
+
+  const stats = [
+    { title: "Membros", value: members.length, icon: Users, color: "bg-primary" },
+    { title: "Ministérios", value: ministries.length, icon: Church, color: "bg-blue-500" },
+    { title: "Estudos", value: studies.length, icon: BookOpen, color: "bg-green-500" },
+    { title: "Louvores", value: songs.length, icon: Music, color: "bg-purple-500" },
+  ];
+
   return (
     <div className="space-y-8">
-      {/* Page header */}
       <div>
-        <h1 className="text-3xl font-semibold text-foreground">Dashboard</h1>
-        <p className="text-muted-foreground mt-1">Welcome back! Here's what's happening with your ministry.</p>
+        <h1 className="text-3xl font-semibold text-foreground">
+          Olá, {user?.name?.split(" ")[0]} 👋
+        </h1>
+        <p className="text-muted-foreground mt-1">Bem-vindo ao Nivah. Aqui está um resumo do sistema.</p>
       </div>
 
-      {/* Stats grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
@@ -87,52 +36,47 @@ export function Dashboard() {
               key={stat.title}
               className="bg-card rounded-xl p-6 border border-border hover:shadow-lg transition-shadow"
             >
-              <div className="flex items-center justify-between mb-4">
-                <div className={`${stat.color} w-12 h-12 rounded-lg flex items-center justify-center`}>
-                  <Icon className="w-6 h-6 text-white" />
-                </div>
-                <TrendingUp className="w-4 h-4 text-green-500" />
+              <div className={`${stat.color} w-12 h-12 rounded-lg flex items-center justify-center mb-4`}>
+                <Icon className="w-6 h-6 text-white" />
               </div>
-              <h3 className="text-sm text-muted-foreground mb-1">{stat.title}</h3>
-              <p className="text-2xl font-semibold text-foreground mb-1">{stat.value}</p>
-              <p className="text-xs text-muted-foreground">{stat.change}</p>
+              <p className="text-sm text-muted-foreground mb-1">{stat.title}</p>
+              <p className="text-3xl font-semibold text-foreground">{stat.value}</p>
             </div>
           );
         })}
       </div>
 
-      {/* Upcoming events */}
       <div className="bg-card rounded-xl border border-border overflow-hidden">
         <div className="px-6 py-4 border-b border-border">
-          <h2 className="text-xl font-semibold text-foreground">Upcoming Events</h2>
+          <h2 className="text-xl font-semibold text-foreground">Próximos Eventos</h2>
         </div>
         <div className="divide-y divide-border">
           {upcomingEvents.map((event) => (
-            <div
-              key={event.id}
-              className="px-6 py-4 hover:bg-secondary/50 transition-colors cursor-pointer"
-            >
+            <div key={event.id} className="px-6 py-4 hover:bg-secondary/50 transition-colors">
               <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <h3 className="font-medium text-foreground mb-1">{event.title}</h3>
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                <div>
+                  <h3 className="font-medium text-foreground">{event.title}</h3>
+                  <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
                     <div className="flex items-center gap-1">
                       <Calendar className="w-4 h-4" />
-                      <span>{event.date}</span>
+                      <span>{new Date(event.date + "T00:00:00").toLocaleDateString("pt-BR")}</span>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <Clock className="w-4 h-4" />
-                      <span>{event.time}</span>
-                    </div>
+                    {event.description && (
+                      <div className="flex items-center gap-1">
+                        <Clock className="w-4 h-4" />
+                        <span className="truncate max-w-[200px]">{event.description}</span>
+                      </div>
+                    )}
                   </div>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Users className="w-4 h-4" />
-                  <span>{event.attendees}</span>
                 </div>
               </div>
             </div>
           ))}
+          {upcomingEvents.length === 0 && (
+            <div className="px-6 py-8 text-center text-muted-foreground text-sm">
+              Nenhum evento futuro cadastrado.
+            </div>
+          )}
         </div>
       </div>
     </div>
