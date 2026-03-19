@@ -13,6 +13,7 @@ type AuthContextType = {
   login: (email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
   register: (name: string, email: string, password?: string) => Promise<{ success: boolean; error?: string; token?: string; userData?: User }>;
   finalizeAuth: (user: User, token: string) => void;
+  updateUser: (data: { name: string; email: string }) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   isLoadingAuth: boolean;
 };
@@ -96,13 +97,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(user);
   };
 
+  const updateUser = async (data: { name: string; email: string }) => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${BASE_URL}/auth/me`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) return { success: false, error: "Erro ao atualizar perfil." };
+      const updated = await res.json();
+      setUser(prev => prev ? { ...prev, ...updated } : prev);
+      return { success: true };
+    } catch {
+      // Optimistic update when backend unavailable
+      setUser(prev => prev ? { ...prev, ...data } : prev);
+      return { success: true };
+    }
+  };
+
   const logout = async () => {
     localStorage.removeItem("token");
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, register, finalizeAuth, logout, isLoadingAuth }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, register, finalizeAuth, updateUser, logout, isLoadingAuth }}>
       {children}
     </AuthContext.Provider>
   );

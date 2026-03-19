@@ -1,15 +1,31 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Outlet, Link, useLocation, Navigate } from 'react-router';
-import { Church, Users, Calendar, Crown, Mail, BookOpen, Music, Search, LogOut, Menu, X } from 'lucide-react';
+import { Church, Users, Calendar, Crown, Mail, BookOpen, Music, Search, LogOut, Menu, X, Sun, Moon, UserCircle } from 'lucide-react';
 import logoImg from '../../assets/53ef4314c936ceb2d472946a347e2bbb419189ab.png';
 import { useAuth } from '../context/AuthContext';
 import { useMockData } from '../context/MockDataContext';
+import { useTheme } from '../context/ThemeContext';
+import { ProfileModal } from './ProfileModal';
 
 export function Layout() {
   const location = useLocation();
   const { isAuthenticated, user, logout } = useAuth();
   const { leaders, members } = useMockData();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+  const { theme, toggleTheme } = useTheme();
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node)) {
+        setIsProfileMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace state={{ from: location }} />;
@@ -53,22 +69,55 @@ export function Layout() {
               </Link>
             </div>
             
-            <div className="flex items-center gap-4">
-              <div className="text-right hidden md:block">
-                <p className="text-sm font-medium text-foreground">
-                  Olá, {user?.name}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {userRoleLabel}
-                </p>
+            <div className="flex items-center gap-3">
+              {/* Profile dropdown */}
+              <div className="relative" ref={profileMenuRef}>
+                <button
+                  onClick={() => setIsProfileMenuOpen(v => !v)}
+                  className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-accent transition-colors"
+                  aria-label="Menu do perfil"
+                >
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center text-primary-foreground text-xs font-bold select-none">
+                    {user?.name?.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() ?? '?'}
+                  </div>
+                  <div className="text-right hidden md:block">
+                    <p className="text-sm font-medium text-foreground leading-tight">
+                      {user?.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground leading-tight">
+                      {userRoleLabel}
+                    </p>
+                  </div>
+                </button>
+
+                {isProfileMenuOpen && (
+                  <div className="absolute right-0 top-full mt-1.5 w-44 rounded-md border border-border bg-popover shadow-lg z-50 py-1">
+                    <button
+                      onClick={() => { setIsProfileMenuOpen(false); setIsProfileModalOpen(true); }}
+                      className="flex items-center gap-2 w-full px-3 py-2 text-sm text-foreground hover:bg-accent transition-colors"
+                    >
+                      <UserCircle className="w-4 h-4 text-muted-foreground" />
+                      Ver perfil
+                    </button>
+                    <div className="my-1 h-px bg-border" />
+                    <button
+                      onClick={() => { setIsProfileMenuOpen(false); logout(); }}
+                      className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Sair
+                    </button>
+                  </div>
+                )}
               </div>
+
               <button
-                onClick={logout}
-                className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-md transition-colors"
-                title="Sair do sistema"
+                onClick={toggleTheme}
+                className="p-2 rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                title={theme === 'dark' ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
+                aria-label="Alternar tema"
               >
-                <LogOut className="w-4 h-4" />
-                <span className="hidden sm:inline">Sair</span>
+                {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
               </button>
             </div>
           </div>
@@ -124,12 +173,30 @@ export function Layout() {
               <span className="text-xl font-semibold text-primary">Nivah</span>
             </div>
             
-            <div className="mb-6 pb-6 border-b border-border">
-              <p className="text-sm font-medium text-muted-foreground">Logado como</p>
-              <p className="text-foreground font-semibold">{user?.name}</p>
+            <div className="mb-6 pb-6 border-b border-border flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Logado como</p>
+                <p className="text-foreground font-semibold">{user?.name}</p>
+              </div>
+              <button
+                onClick={toggleTheme}
+                className="p-2 rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                title={theme === 'dark' ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
+                aria-label="Alternar tema"
+              >
+                {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+              </button>
             </div>
 
             <div className="flex flex-col gap-2 flex-grow">
+              <button
+                onClick={() => { setIsMobileMenuOpen(false); setIsProfileModalOpen(true); }}
+                className="flex items-center gap-3 px-4 py-3 rounded-md text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+              >
+                <UserCircle className="w-5 h-5" />
+                Ver perfil
+              </button>
+              <div className="my-1 h-px bg-border" />
               {navigation.map((item) => {
                 const isActive = location.pathname === item.href;
                 const Icon = item.icon;
@@ -149,10 +216,25 @@ export function Layout() {
                   </Link>
                 );
               })}
+              <div className="mt-auto pt-4 border-t border-border">
+                <button
+                  onClick={() => { setIsMobileMenuOpen(false); logout(); }}
+                  className="flex items-center gap-3 w-full px-4 py-3 rounded-md text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
+                >
+                  <LogOut className="w-5 h-5" />
+                  Sair
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
+
+      <ProfileModal
+        open={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        roleLabel={userRoleLabel}
+      />
 
       {/* Main Content */}
       <main className="flex-grow w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
