@@ -3,6 +3,7 @@ package com.nivah.service;
 import com.nivah.dto.AuthResponse;
 import com.nivah.dto.LoginRequest;
 import com.nivah.dto.SignupRequest;
+import com.nivah.model.Role;
 import com.nivah.model.User;
 import com.nivah.repository.UserRepository;
 import com.nivah.security.JwtTokenProvider;
@@ -29,7 +30,14 @@ public class AuthService {
             throw new IllegalArgumentException("Email already registered: " + request.getEmail());
         }
 
-        String role = StringUtils.hasText(request.getRole()) ? request.getRole() : "Membro";
+        Role role = Role.MEMBRO;
+        if (StringUtils.hasText(request.getRole())) {
+            try {
+                role = Role.valueOf(request.getRole().toUpperCase());
+            } catch (IllegalArgumentException ignored) {
+                role = Role.MEMBRO;
+            }
+        }
 
         User user = User.builder()
                 .name(request.getName())
@@ -43,17 +51,18 @@ public class AuthService {
         UserDetails userDetails = org.springframework.security.core.userdetails.User
                 .withUsername(user.getEmail())
                 .password(user.getPassword())
-                .authorities("ROLE_" + user.getRole())
+                .authorities("ROLE_" + user.getRole().name())
                 .build();
 
-        String token = jwtTokenProvider.generateToken(userDetails);
+        String token = jwtTokenProvider.generateToken(userDetails, user.getRole());
 
         return AuthResponse.builder()
                 .token(token)
                 .id(user.getId())
                 .name(user.getName())
                 .email(user.getEmail())
-                .role(user.getRole())
+                .role(user.getRole().name())
+                .photoUrl(user.getPhotoUrl())
                 .build();
     }
 
@@ -67,14 +76,15 @@ public class AuthService {
         User user = userRepository.findByEmail(userDetails.getUsername())
                 .orElseThrow(() -> new IllegalStateException("User not found after authentication"));
 
-        String token = jwtTokenProvider.generateToken(userDetails);
+        String token = jwtTokenProvider.generateToken(userDetails, user.getRole());
 
         return AuthResponse.builder()
                 .token(token)
                 .id(user.getId())
                 .name(user.getName())
                 .email(user.getEmail())
-                .role(user.getRole())
+                .role(user.getRole().name())
+                .photoUrl(user.getPhotoUrl())
                 .build();
     }
 
@@ -87,7 +97,23 @@ public class AuthService {
                 .id(user.getId())
                 .name(user.getName())
                 .email(user.getEmail())
-                .role(user.getRole())
+                .role(user.getRole().name())
+                .photoUrl(user.getPhotoUrl())
+                .build();
+    }
+
+    public AuthResponse updatePhoto(String email, String photoUrl) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalStateException("User not found: " + email));
+        user.setPhotoUrl(photoUrl);
+        user = userRepository.save(user);
+        return AuthResponse.builder()
+                .token(null)
+                .id(user.getId())
+                .name(user.getName())
+                .email(user.getEmail())
+                .role(user.getRole().name())
+                .photoUrl(user.getPhotoUrl())
                 .build();
     }
 }

@@ -8,14 +8,14 @@ import { toast } from "sonner";
 
 const BASE_URL = "http://localhost:8080/api";
 
-type MinistryOption = { id: string; name: string; city: string; isPending?: boolean };
+type IgrejaOption = { id: string; nome: string; cidade?: string; isPending?: boolean };
 
 export function Login() {
   const { login, register, finalizeAuth, isAuthenticated } = useAuth();
 
   const [isRegistering, setIsRegistering] = useState(false);
-  const [isSelectingMinistry, setIsSelectingMinistry] = useState(false);
-  const [isAddingNewMinistry, setIsAddingNewMinistry] = useState(false);
+  const [isSelectingIgreja, setIsSelectingIgreja] = useState(false);
+  const [isAddingNewIgreja, setIsAddingNewIgreja] = useState(false);
 
   // Login states
   const [email, setEmail] = useState("");
@@ -30,27 +30,26 @@ export function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // Ministry states (loaded directly, no context needed)
-  const [ministries, setMinistries] = useState<MinistryOption[]>([]);
+  // Igreja states
+  const [igrejas, setIgrejas] = useState<IgrejaOption[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedMinistries, setSelectedMinistries] = useState<string[]>([]);
-  // Pending new ministry is deferred: created after registration (when we have a token)
-  const [pendingNewMinistry, setPendingNewMinistry] = useState<{ name: string; city: string } | null>(null);
+  const [selectedIgrejaId, setSelectedIgrejaId] = useState<string | null>(null);
+  const [pendingNewIgreja, setPendingNewIgreja] = useState<{ nome: string; cidade: string } | null>(null);
 
-  // New Ministry form states
-  const [newMinistryName, setNewMinistryName] = useState("");
-  const [newMinistryCity, setNewMinistryCity] = useState("");
+  // New Igreja form states
+  const [newIgrejaNome, setNewIgrejaNome] = useState("");
+  const [newIgrejaCidade, setNewIgrejaCidade] = useState("");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Load existing ministries when entering the ministry selection step (endpoint is public)
+  // Load existing igrejas when entering the selection step (endpoint is public)
   useEffect(() => {
-    if (!isSelectingMinistry) return;
-    fetch(`${BASE_URL}/ministries`)
+    if (!isSelectingIgreja) return;
+    fetch(`${BASE_URL}/igrejas`)
       .then(r => (r.ok ? r.json() : []))
-      .then(setMinistries)
-      .catch(() => setMinistries([]));
-  }, [isSelectingMinistry]);
+      .then((data: any[]) => setIgrejas(data.map(i => ({ id: i.id, nome: i.nome, cidade: i.cidade }))))
+      .catch(() => setIgrejas([]));
+  }, [isSelectingIgreja]);
 
   if (isAuthenticated) {
     return <Navigate to="/" replace />;
@@ -86,21 +85,22 @@ export function Login() {
       return;
     }
 
-    setIsSelectingMinistry(true);
+    setIsSelectingIgreja(true);
   };
 
   const handleFinishRegistration = async () => {
-    if (selectedMinistries.length === 0) {
-      toast.error("Selecione pelo menos um ministério para se vincular.");
+    if (!selectedIgrejaId) {
+      toast.error("Selecione ou cadastre uma igreja para se vincular.");
       return;
     }
 
     setIsSubmitting(true);
-    const toastId = toast.loading("Criando conta e vinculando ao ministério...");
+    const isNewIgreja = selectedIgrejaId === "pending-new";
+    const toastId = toast.loading("Criando conta...");
 
-    // register() now returns token + userData WITHOUT triggering navigation yet.
-    // This lets us finish creating ministry/member before MockDataProvider loads.
-    const result = await register(name, email, password);
+    // Se está criando uma nova igreja, registra como PASTOR; caso contrário, como MEMBRO
+    const role = isNewIgreja ? "PASTOR" : "MEMBRO";
+    const result = await register(name, email, password, role);
     if (!result.success) {
       toast.error(result.error || "Erro ao criar conta.", { id: toastId });
       setIsSubmitting(false);
@@ -110,76 +110,61 @@ export function Login() {
     const { token, userData } = result;
     const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
 
-    // Determine the ministry ID to link the member to
-    let ministryId = selectedMinistries[0];
+    let igrejaId = selectedIgrejaId;
 
-    // If there's a pending new ministry (created before auth), create it now
-    if (pendingNewMinistry && ministryId === "pending-new") {
+    // Se é uma nova igreja, cria ela agora (o serviço já vincula o PASTOR automaticamente)
+    if (isNewIgreja && pendingNewIgreja) {
       try {
-        const res = await fetch(`${BASE_URL}/ministries`, {
+        const res = await fetch(`${BASE_URL}/igrejas`, {
           method: "POST",
           headers,
-          body: JSON.stringify({
-            name: pendingNewMinistry.name,
-            city: pendingNewMinistry.city,
-            description: "Cadastrado via formulário de registro",
-          }),
+          body: JSON.stringify({ nome: pendingNewIgreja.nome, cidade: pendingNewIgreja.cidade }),
         });
         const created = await res.json();
-        ministryId = created.id;
+        igrejaId = created.id;
       } catch {
-        ministryId = "";
+        igrejaId = "";
       }
     }
 
-    // Create the member record linked to the chosen ministry
-    try {
-      await fetch(`${BASE_URL}/members`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ name, email, phone, ministryId: ministryId || undefined }),
-      });
-    } catch {
-      // Non-critical — user account was created successfully
+    // Vincula o usuário à igreja como membro
+    if (igrejaId && igrejaId !== "pending-new") {
+      try {
+        await fetch(`${BASE_URL}/membros`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ email, igrejaId, phone: phone || undefined }),
+        });
+      } catch {
+        // Non-critical — user account was created successfully
+      }
     }
 
     toast.success("Conta criada com sucesso! Bem-vindo ao Nivah.", { id: toastId });
     setIsSubmitting(false);
-
-    // Only NOW trigger navigation — ministry and member are already in the DB,
-    // so when MockDataProvider loads its data everything will be visible.
     finalizeAuth(userData!, token!);
   };
 
-  const handleAddNewMinistry = (e: React.FormEvent) => {
+  const handleAddNewIgreja = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMinistryName || !newMinistryCity) return;
+    if (!newIgrejaNome || !newIgrejaCidade) return;
 
-    // Store the data locally — the ministry will be created after registration (needs auth token)
     const tempId = "pending-new";
-    setPendingNewMinistry({ name: newMinistryName, city: newMinistryCity });
-    setMinistries(prev => [
-      ...prev.filter(m => m.id !== tempId),
-      { id: tempId, name: newMinistryName, city: newMinistryCity, isPending: true },
+    setPendingNewIgreja({ nome: newIgrejaNome, cidade: newIgrejaCidade });
+    setIgrejas(prev => [
+      ...prev.filter(i => i.id !== tempId),
+      { id: tempId, nome: newIgrejaNome, cidade: newIgrejaCidade, isPending: true },
     ]);
-    setSelectedMinistries(prev => [...prev.filter(id => id !== tempId), tempId]);
-    setNewMinistryName("");
-    setNewMinistryCity("");
-    setIsAddingNewMinistry(false);
+    setSelectedIgrejaId(tempId);
+    setNewIgrejaNome("");
+    setNewIgrejaCidade("");
+    setIsAddingNewIgreja(false);
     setSearchQuery("");
   };
 
-  const toggleMinistrySelection = (id: string) => {
-    setSelectedMinistries(prev => 
-      prev.includes(id) 
-        ? prev.filter(mId => mId !== id)
-        : [...prev, id]
-    );
-  };
-
-  const filteredMinistries = ministries.filter(m => 
-    m.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    m.city.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredIgrejas = igrejas.filter(i =>
+    i.nome.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (i.cidade ?? "").toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -190,23 +175,23 @@ export function Login() {
             <img src={logoImg} alt="Niva Logo" className="w-16 h-16 object-contain" />
           </div>
           <h2 className="text-3xl font-bold text-foreground tracking-tight">
-            {isSelectingMinistry 
-              ? "Vínculo Ministerial" 
-              : isRegistering 
-                ? "Crie sua Conta" 
+            {isSelectingIgreja
+              ? "Sua Igreja"
+              : isRegistering
+                ? "Crie sua Conta"
                 : "Bem-vindo ao Nivah"}
           </h2>
           <p className="text-muted-foreground mt-2">
-            {isSelectingMinistry
-              ? "Selecione os ministérios dos quais você faz parte"
-              : isRegistering 
-                ? "Cadastre-se para acessar o sistema da sua igreja" 
+            {isSelectingIgreja
+              ? "Selecione ou cadastre a igreja à qual você pertence"
+              : isRegistering
+                ? "Cadastre-se para acessar o sistema da sua igreja"
                 : "Faça login para acessar o sistema"}
           </p>
         </div>
 
         <Card className="p-8 border-primary/20 shadow-lg relative overflow-hidden">
-          {!isRegistering && !isSelectingMinistry && (
+          {!isRegistering && !isSelectingIgreja && (
             // Login Form
             <form onSubmit={handleLoginSubmit} className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
               <div className="space-y-2">
@@ -263,7 +248,7 @@ export function Login() {
             </form>
           )}
 
-          {isRegistering && !isSelectingMinistry && (
+          {isRegistering && !isSelectingIgreja && (
             // Step 1: Register Person Form
             <form onSubmit={handleRegisterPersonSubmit} className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
               <div className="space-y-2">
@@ -371,10 +356,10 @@ export function Login() {
             </form>
           )}
 
-          {isSelectingMinistry && (
-            // Step 2: Select Ministry
+          {isSelectingIgreja && (
+            // Step 2: Select Igreja
             <div className="space-y-4 animate-in slide-in-from-right-8 fade-in">
-              {!isAddingNewMinistry ? (
+              {!isAddingNewIgreja ? (
                 <>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -385,27 +370,30 @@ export function Login() {
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="w-full pl-10 pr-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary transition-shadow"
-                      placeholder="Buscar ministério pelo nome..."
+                      placeholder="Buscar igreja pelo nome ou cidade..."
                     />
                   </div>
 
                   <div className="mt-4 border rounded-md max-h-[250px] overflow-y-auto bg-muted/20">
-                    {filteredMinistries.length > 0 ? (
+                    {filteredIgrejas.length > 0 ? (
                       <ul className="divide-y">
-                        {filteredMinistries.map((ministry) => (
-                          <li key={ministry.id}>
+                        {filteredIgrejas.map((igreja) => (
+                          <li key={igreja.id}>
                             <button
                               type="button"
-                              onClick={() => toggleMinistrySelection(ministry.id)}
+                              onClick={() => setSelectedIgrejaId(igreja.id)}
                               className={`w-full text-left px-4 py-3 flex items-center justify-between hover:bg-muted transition-colors ${
-                                selectedMinistries.includes(ministry.id) ? "bg-primary/5" : ""
+                                selectedIgrejaId === igreja.id ? "bg-primary/5" : ""
                               }`}
                             >
                               <div>
-                                <p className="font-medium text-foreground">{ministry.name}</p>
-                                <p className="text-xs text-muted-foreground">{ministry.city}</p>
+                                <p className="font-medium text-foreground">
+                                  {igreja.nome}
+                                  {igreja.isPending && <span className="ml-2 text-xs text-primary">(nova)</span>}
+                                </p>
+                                <p className="text-xs text-muted-foreground">{igreja.cidade}</p>
                               </div>
-                              {selectedMinistries.includes(ministry.id) && (
+                              {selectedIgrejaId === igreja.id && (
                                 <CheckCircle2 className="w-5 h-5 text-primary" />
                               )}
                             </button>
@@ -413,8 +401,8 @@ export function Login() {
                         ))}
                       </ul>
                     ) : (
-                      <div className="p-4 text-center text-sm text-muted-foreground flex flex-col items-center gap-2">
-                        <p>Nenhum ministério encontrado com este nome.</p>
+                      <div className="p-4 text-center text-sm text-muted-foreground">
+                        <p>Nenhuma igreja encontrada.</p>
                       </div>
                     )}
                   </div>
@@ -422,10 +410,10 @@ export function Login() {
                   <div className="flex justify-center">
                     <button
                       type="button"
-                      onClick={() => setIsAddingNewMinistry(true)}
+                      onClick={() => setIsAddingNewIgreja(true)}
                       className="text-sm text-primary font-medium hover:underline flex items-center gap-1"
                     >
-                      <Plus className="w-4 h-4" /> 
+                      <Plus className="w-4 h-4" />
                       Não encontrou sua igreja? Cadastrar nova
                     </button>
                   </div>
@@ -433,7 +421,7 @@ export function Login() {
                   <div className="flex gap-3 pt-2">
                     <button
                       type="button"
-                      onClick={() => setIsSelectingMinistry(false)}
+                      onClick={() => setIsSelectingIgreja(false)}
                       className="px-4 py-2.5 border rounded-md hover:bg-muted focus:outline-none font-medium transition-colors text-foreground"
                     >
                       Voltar
@@ -441,7 +429,7 @@ export function Login() {
                     <button
                       type="button"
                       onClick={handleFinishRegistration}
-                      disabled={selectedMinistries.length === 0 || isSubmitting}
+                      disabled={!selectedIgrejaId || isSubmitting}
                       className="flex-1 py-2.5 px-4 bg-[#0000FF] text-white rounded-md hover:bg-[#0000CC] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0000FF] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                     >
                       {isSubmitting ? "Criando conta..." : "Finalizar Cadastro"}
@@ -449,9 +437,9 @@ export function Login() {
                   </div>
                 </>
               ) : (
-                <form onSubmit={handleAddNewMinistry} className="space-y-4 animate-in fade-in slide-in-from-right-4">
+                <form onSubmit={handleAddNewIgreja} className="space-y-4 animate-in fade-in slide-in-from-right-4">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Nome da Igreja/Ministério</label>
+                    <label className="text-sm font-medium">Nome da Igreja</label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <Church className="h-5 w-5 text-muted-foreground" />
@@ -459,10 +447,10 @@ export function Login() {
                       <input
                         required
                         type="text"
-                        value={newMinistryName}
-                        onChange={(e) => setNewMinistryName(e.target.value)}
+                        value={newIgrejaNome}
+                        onChange={(e) => setNewIgrejaNome(e.target.value)}
                         className="w-full pl-10 pr-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary transition-shadow"
-                        placeholder="Ex: Primeira Igreja..."
+                        placeholder="Ex: Primeira Igreja Batista..."
                       />
                     </div>
                   </div>
@@ -476,18 +464,22 @@ export function Login() {
                       <input
                         required
                         type="text"
-                        value={newMinistryCity}
-                        onChange={(e) => setNewMinistryCity(e.target.value)}
+                        value={newIgrejaCidade}
+                        onChange={(e) => setNewIgrejaCidade(e.target.value)}
                         className="w-full pl-10 pr-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary transition-shadow"
                         placeholder="Ex: São Paulo, SP"
                       />
                     </div>
                   </div>
 
-                  <div className="flex gap-3 pt-4">
+                  <p className="text-xs text-muted-foreground">
+                    Ao cadastrar uma nova igreja você será registrado como pastor responsável.
+                  </p>
+
+                  <div className="flex gap-3 pt-2">
                     <button
                       type="button"
-                      onClick={() => setIsAddingNewMinistry(false)}
+                      onClick={() => setIsAddingNewIgreja(false)}
                       className="px-4 py-2.5 border rounded-md hover:bg-muted focus:outline-none font-medium transition-colors text-foreground"
                     >
                       Cancelar
@@ -504,7 +496,7 @@ export function Login() {
             </div>
           )}
 
-          {!isSelectingMinistry && (
+          {!isSelectingIgreja && (
             <div className="mt-6 text-center text-sm text-muted-foreground border-t pt-6">
               {!isRegistering ? (
                 <>

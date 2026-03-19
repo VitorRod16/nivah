@@ -1,5 +1,6 @@
 package com.nivah.security;
 
+import com.nivah.model.Role;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,12 +25,13 @@ public class JwtTokenProvider {
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
-    public String generateToken(UserDetails userDetails) {
+    public String generateToken(UserDetails userDetails, Role role) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtExpiration);
 
         return Jwts.builder()
                 .subject(userDetails.getUsername())
+                .claim("role", role.name())
                 .issuedAt(now)
                 .expiration(expiryDate)
                 .signWith(getSigningKey())
@@ -38,6 +40,10 @@ public class JwtTokenProvider {
 
     public String extractUsername(String token) {
         return parseClaims(token).getSubject();
+    }
+
+    public String extractRole(String token) {
+        return (String) parseClaims(token).get("role");
     }
 
     public boolean validateToken(String token, UserDetails userDetails) {

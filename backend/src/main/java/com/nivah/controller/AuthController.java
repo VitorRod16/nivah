@@ -10,6 +10,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
+
 import java.util.Map;
 
 @RestController
@@ -41,5 +44,16 @@ public class AuthController {
         String email = authentication.getName();
         AuthResponse response = authService.getCurrentUser(email);
         return ResponseEntity.ok(response);
+    }
+
+    @PutMapping("/me/photo")
+    public ResponseEntity<?> updatePhoto(@RequestBody Map<String, String> body, @AuthenticationPrincipal UserDetails userDetails) {
+        try {
+            String photoUrl = body.get("photoUrl");
+            AuthResponse response = authService.updatePhoto(userDetails.getUsername(), photoUrl);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
     }
 }

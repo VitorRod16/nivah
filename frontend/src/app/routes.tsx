@@ -1,6 +1,8 @@
-import { createBrowserRouter, Outlet } from "react-router";
+import { createBrowserRouter, Navigate, Outlet } from "react-router";
 import { Layout } from "./components/layout";
 import { Home } from "./pages/home";
+import { Igrejas } from "./pages/igrejas";
+import { Membros } from "./pages/membros";
 import { Members } from "./pages/members";
 import { Ministries } from "./pages/ministries";
 import { Calendar } from "./pages/calendar";
@@ -9,6 +11,7 @@ import { Invitations } from "./pages/invitations";
 import { Studies } from "./pages/studies";
 import { Worship } from "./pages/worship";
 import { Search } from "./pages/search";
+import { Dizimos } from "./pages/dizimos";
 import { NotFound } from "./pages/not-found";
 import { Login } from "./pages/login";
 import { AuthProvider } from "./context/AuthContext";
@@ -58,7 +61,9 @@ export const router = createBrowserRouter([
         ),
         children: [
           { index: true, Component: Home },
-          { path: "members", Component: Members },
+          { path: "igrejas", Component: Igrejas },
+          { path: "membros", Component: Membros },
+          { path: "members", element: <Navigate to="/membros" replace /> },
           { path: "ministries", Component: Ministries },
           { path: "calendar", Component: Calendar },
           { path: "leadership", Component: Leadership },
@@ -66,6 +71,7 @@ export const router = createBrowserRouter([
           { path: "studies", Component: Studies },
           { path: "worship", Component: Worship },
           { path: "search", Component: Search },
+          { path: "dizimos", Component: Dizimos },
           { path: "*", Component: NotFound },
         ],
       },

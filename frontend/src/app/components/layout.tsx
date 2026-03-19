@@ -1,16 +1,16 @@
 import { useState, useRef, useEffect } from 'react';
 import { Outlet, Link, useLocation, Navigate } from 'react-router';
-import { Church, Users, Calendar, Crown, Mail, BookOpen, Music, Search, LogOut, Menu, X, Sun, Moon, UserCircle } from 'lucide-react';
+import { Church, Users, Calendar, Crown, Mail, BookOpen, Music, Search, LogOut, Menu, X, Sun, Moon, UserCircle, DollarSign } from 'lucide-react';
 import logoImg from '../../assets/53ef4314c936ceb2d472946a347e2bbb419189ab.png';
 import { useAuth } from '../context/AuthContext';
-import { useMockData } from '../context/MockDataContext';
+import { useRole } from '../hooks/useRole';
 import { useTheme } from '../context/ThemeContext';
 import { ProfileModal } from './ProfileModal';
 
 export function Layout() {
   const location = useLocation();
   const { isAuthenticated, user, logout } = useAuth();
-  const { leaders, members } = useMockData();
+  const { label: userRoleLabel, isAdmin, canManage } = useRole();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -31,23 +31,19 @@ export function Layout() {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
-  const currentMember = members.find(m => m.email === user?.email);
-  const currentLeader = currentMember ? leaders.find(l => l.memberId === currentMember.id) : null;
-  const userRoleLabel = currentLeader?.roles?.length
-    ? currentLeader.roles.join(", ")
-    : (user?.role || "Membro");
-  
   const navigation = [
-    { name: 'Início', href: '/', icon: Church },
-    { name: 'Membros', href: '/members', icon: Users },
-    { name: 'Ministérios', href: '/ministries', icon: Church },
-    { name: 'Calendário', href: '/calendar', icon: Calendar },
-    { name: 'Liderança', href: '/leadership', icon: Crown },
-    { name: 'Convites', href: '/invitations', icon: Mail },
-    { name: 'Estudos', href: '/studies', icon: BookOpen },
-    { name: 'Louvores', href: '/worship', icon: Music },
-    { name: 'Buscar', href: '/search', icon: Search },
-  ];
+    { name: 'Início', href: '/', icon: Church, show: true },
+    { name: 'Igrejas', href: '/igrejas', icon: Church, show: isAdmin },
+    { name: 'Membros', href: '/membros', icon: Users, show: true },
+    { name: 'Ministérios', href: '/ministries', icon: Church, show: canManage },
+    { name: 'Calendário', href: '/calendar', icon: Calendar, show: true },
+    { name: 'Liderança', href: '/leadership', icon: Crown, show: canManage },
+    { name: 'Convites', href: '/invitations', icon: Mail, show: canManage },
+    { name: 'Dízimos e Ofertas', href: '/dizimos', icon: DollarSign, show: true },
+    { name: 'Estudos', href: '/studies', icon: BookOpen, show: true },
+    { name: 'Louvores', href: '/worship', icon: Music, show: true },
+    { name: 'Buscar', href: '/search', icon: Search, show: true },
+  ].filter(item => item.show);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">

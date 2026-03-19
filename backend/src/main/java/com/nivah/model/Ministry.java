@@ -25,4 +25,7 @@ public class Ministry {
     private String city;
 
     private String pastor;
+
+    @Column(name = "igreja_id")
+    private UUID igrejaId;
 }

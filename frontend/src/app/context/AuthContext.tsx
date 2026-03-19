@@ -1,19 +1,23 @@
 import { createContext, useContext, useState, ReactNode, useEffect } from "react";
 
+export type UserRole = "ADMIN" | "PASTOR" | "MEMBRO";
+
 export type User = {
   id: string;
   name: string;
   email: string;
-  role?: string;
+  role: UserRole;
+  photoUrl?: string;
 };
 
 type AuthContextType = {
   user: User | null;
   isAuthenticated: boolean;
   login: (email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
-  register: (name: string, email: string, password?: string) => Promise<{ success: boolean; error?: string; token?: string; userData?: User }>;
+  register: (name: string, email: string, password?: string, role?: UserRole) => Promise<{ success: boolean; error?: string; token?: string; userData?: User }>;
   finalizeAuth: (user: User, token: string) => void;
   updateUser: (data: { name: string; email: string }) => Promise<{ success: boolean; error?: string }>;
+  updatePhoto: (photoUrl: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   isLoadingAuth: boolean;
 };
@@ -36,7 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
         if (res.ok) {
           const data = await res.json();
-          setUser(data);
+          setUser({ id: data.id, name: data.name, email: data.email, role: data.role ?? "MEMBRO", photoUrl: data.photoUrl });
         } else {
           localStorage.removeItem("token");
         }
@@ -60,32 +64,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = await res.json();
       if (!res.ok) return { success: false, error: "E-mail ou senha incorretos." };
       localStorage.setItem("token", data.token);
-      setUser({ id: data.id, name: data.name, email: data.email, role: data.role });
+      setUser({ id: data.id, name: data.name, email: data.email, role: data.role ?? "MEMBRO", photoUrl: data.photoUrl });
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message };
     }
   };
 
-  const register = async (name: string, email: string, password?: string) => {
+  const register = async (name: string, email: string, password?: string, role: UserRole = "MEMBRO") => {
     try {
       if (!password) return { success: false, error: "Senha não fornecida." };
       const res = await fetch(`${BASE_URL}/auth/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password, role: "Membro" }),
+        body: JSON.stringify({ name, email, password, role }),
       });
       const data = await res.json();
       if (!res.ok) {
         let errorMsg = data.message || "Erro ao registrar usuário.";
         if (errorMsg.includes("already")) errorMsg = "Este e-mail já está em uso.";
-        else if (errorMsg.includes("password")) errorMsg = "A senha deve ter no mínimo 6 caracteres.";
         return { success: false, error: errorMsg };
       }
-      // Return token and user data WITHOUT setting auth state yet.
-      // The caller is responsible for calling finalizeAuth() after any
-      // post-registration setup (e.g. creating ministry/member) is complete.
-      const userData: User = { id: data.id, name: data.name, email: data.email, role: data.role };
+      const userData: User = { id: data.id, name: data.name, email: data.email, role: data.role ?? "MEMBRO" };
       return { success: true, token: data.token, userData };
     } catch (err: any) {
       return { success: false, error: err.message };
@@ -110,9 +110,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(prev => prev ? { ...prev, ...updated } : prev);
       return { success: true };
     } catch {
-      // Optimistic update when backend unavailable
       setUser(prev => prev ? { ...prev, ...data } : prev);
       return { success: true };
+    }
+  };
+
+  const updatePhoto = async (photoUrl: string) => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${BASE_URL}/auth/me/photo`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ photoUrl }),
+      });
+      if (!res.ok) return { success: false, error: "Erro ao atualizar foto." };
+      setUser(prev => prev ? { ...prev, photoUrl } : prev);
+      return { success: true };
+    } catch {
+      return { success: false, error: "Erro ao atualizar foto." };
     }
   };
 
@@ -122,7 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, register, finalizeAuth, updateUser, logout, isLoadingAuth }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, register, finalizeAuth, updateUser, updatePhoto, logout, isLoadingAuth }}>
       {children}
     </AuthContext.Provider>
   );

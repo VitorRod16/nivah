@@ -1,5 +1,6 @@
 package com.nivah.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -23,10 +24,15 @@ public class User {
     @Column(nullable = false, unique = true)
     private String email;
 
+    @JsonIgnore
     @Column(nullable = false)
     private String password;
 
     @Builder.Default
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String role = "Membro";
+    private Role role = Role.MEMBRO;
+
+    @Column(columnDefinition = "TEXT")
+    private String photoUrl;
 }

@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Pencil, Check, X, User } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Pencil, Check, X, Camera } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -15,12 +15,14 @@ interface ProfileModalProps {
 }
 
 export function ProfileModal({ open, onClose, roleLabel }: ProfileModalProps) {
-  const { user, updateUser } = useAuth();
+  const { user, updateUser, updatePhoto } = useAuth();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(user?.name ?? '');
   const [email, setEmail] = useState(user?.email ?? '');
   const [saving, setSaving] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [error, setError] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (open) {
@@ -58,6 +60,25 @@ export function ProfileModal({ open, onClose, roleLabel }: ProfileModalProps) {
     setError('');
   };
 
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      setError('A foto deve ter no máximo 2MB.');
+      return;
+    }
+    setUploadingPhoto(true);
+    setError('');
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64 = reader.result as string;
+      const result = await updatePhoto(base64);
+      setUploadingPhoto(false);
+      if (!result.success) setError(result.error ?? 'Erro ao salvar foto.');
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
       <DialogContent className="sm:max-w-md">
@@ -66,10 +87,41 @@ export function ProfileModal({ open, onClose, roleLabel }: ProfileModalProps) {
         </DialogHeader>
 
         <div className="flex flex-col items-center gap-4 pt-2">
-          {/* Avatar */}
-          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center text-primary-foreground text-2xl font-bold select-none">
-            {initials}
+          {/* Avatar com botão de foto */}
+          <div className="relative group">
+            {user?.photoUrl ? (
+              <img
+                src={user.photoUrl}
+                alt={user.name}
+                className="w-20 h-20 rounded-full object-cover ring-2 ring-primary/20"
+              />
+            ) : (
+              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center text-primary-foreground text-2xl font-bold select-none">
+                {initials}
+              </div>
+            )}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingPhoto}
+              className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+              title="Trocar foto"
+            >
+              <Camera className="w-5 h-5 text-white" />
+            </button>
+            {uploadingPhoto && (
+              <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center">
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
           </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handlePhotoChange}
+          />
+          <p className="text-xs text-muted-foreground -mt-2">Clique na foto para trocar (máx. 2MB)</p>
 
           {editing ? (
             <div className="w-full flex flex-col gap-3">
@@ -128,6 +180,7 @@ export function ProfileModal({ open, onClose, roleLabel }: ProfileModalProps) {
                   <span className="text-sm text-foreground">{roleLabel}</span>
                 </div>
               </div>
+              {error && <p className="text-xs text-destructive">{error}</p>}
               <div className="flex justify-end mt-1">
                 <button
                   onClick={() => setEditing(true)}
