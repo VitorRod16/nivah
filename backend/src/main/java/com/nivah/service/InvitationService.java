@@ -18,6 +18,7 @@ import jakarta.mail.internet.MimeMessage;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 @Service
@@ -55,8 +56,6 @@ public class InvitationService {
     public SendResult sendInvitations(InvitationRequest request) {
         List<Member> recipients = resolveRecipients(request);
 
-        int sent = dispatchEmails(recipients, request);
-
         Invitation invitation = Invitation.builder()
                 .title(request.getTitle())
                 .date(request.getDate())
@@ -67,10 +66,15 @@ public class InvitationService {
                 .ministryIds(request.getMinistryIds() != null ? request.getMinistryIds() : List.of())
                 .status("enviado")
                 .sentDate(LocalDate.now().toString())
-                .recipientCount(sent)
+                .recipientCount(recipients.size())
                 .build();
 
-        return new SendResult(invitationRepository.save(invitation), sent);
+        Invitation saved = invitationRepository.save(invitation);
+
+        // Envia e-mails em background para não bloquear a resposta HTTP
+        CompletableFuture.runAsync(() -> dispatchEmails(recipients, request));
+
+        return new SendResult(saved, recipients.size());
     }
 
     public Invitation sendDraft(UUID id) {
@@ -87,13 +91,17 @@ public class InvitationService {
         request.setMinistryIds(invitation.getMinistryIds());
 
         List<Member> recipients = resolveRecipients(request);
-        int sent = dispatchEmails(recipients, request);
 
         invitation.setStatus("enviado");
         invitation.setSentDate(LocalDate.now().toString());
-        invitation.setRecipientCount(sent);
+        invitation.setRecipientCount(recipients.size());
 
-        return invitationRepository.save(invitation);
+        Invitation saved = invitationRepository.save(invitation);
+
+        // Envia e-mails em background para não bloquear a resposta HTTP
+        CompletableFuture.runAsync(() -> dispatchEmails(recipients, request));
+
+        return saved;
     }
 
     public void delete(UUID id) {

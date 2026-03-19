@@ -132,41 +132,83 @@ export function Invitations() {
 
   const handleSaveDraft = async () => {
     if (!validate()) return;
+    const payload = buildPayload();
+
+    // Otimista: fecha imediatamente e adiciona à lista
+    const optimisticId = `temp-${Date.now()}`;
+    const optimistic: Invitation = {
+      id: optimisticId,
+      title: invTitle,
+      date: date || null,
+      time: time || null,
+      location: location || null,
+      message: message || null,
+      status: 'rascunho',
+      sentDate: null,
+      allMinistries,
+      ministryIds: allMinistries ? [] : selectedMinistries,
+      recipientCount: 0,
+      recipients: previewRecipients,
+    };
+    setInvitations(prev => [optimistic, ...prev]);
+    resetForm();
+    setOpen(false);
+
     try {
       const res = await fetch(`${BASE_URL}/invitations/draft`, {
         method: 'POST',
         headers: authHeaders(),
-        body: JSON.stringify(buildPayload()),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error();
       const saved: ApiInvitation = await res.json();
-      setInvitations(prev => [toInvitation(saved), ...prev]);
+      setInvitations(prev => prev.map(i => i.id === optimisticId ? toInvitation(saved) : i));
       toast.success('Rascunho salvo com sucesso.');
-      resetForm();
-      setOpen(false);
     } catch {
+      setInvitations(prev => prev.filter(i => i.id !== optimisticId));
       toast.error('Falha ao salvar rascunho.');
     }
   };
 
   const handleSend = async () => {
     if (isSending || !validate()) return;
-    setIsSending(true);
+    const payload = buildPayload();
+
+    // Otimista: fecha imediatamente e adiciona à lista
+    const optimisticId = `temp-${Date.now()}`;
+    const optimistic: Invitation = {
+      id: optimisticId,
+      title: invTitle,
+      date: date || null,
+      time: time || null,
+      location: location || null,
+      message: message || null,
+      status: 'enviado',
+      sentDate: new Date().toISOString().split('T')[0],
+      allMinistries,
+      ministryIds: allMinistries ? [] : selectedMinistries,
+      recipientCount: previewRecipients.length,
+      recipients: previewRecipients,
+    };
+    setInvitations(prev => [optimistic, ...prev]);
+    resetForm();
+    setOpen(false);
+
     const toastId = toast.loading('Enviando convites...');
+    setIsSending(true);
     try {
       const res = await fetch(`${BASE_URL}/invitations/send`, {
         method: 'POST',
         headers: authHeaders(),
-        body: JSON.stringify(buildPayload()),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Erro ao enviar.');
       const saved: ApiInvitation = data.invitation;
-      setInvitations(prev => [toInvitation(saved), ...prev]);
+      setInvitations(prev => prev.map(i => i.id === optimisticId ? toInvitation(saved) : i));
       toast.success(`Convite enviado para ${data.sent} membro(s)!`, { id: toastId });
-      resetForm();
-      setOpen(false);
     } catch (err: any) {
+      setInvitations(prev => prev.filter(i => i.id !== optimisticId));
       toast.error(err.message || 'Falha ao enviar convites.', { id: toastId });
     } finally {
       setIsSending(false);
@@ -174,6 +216,11 @@ export function Invitations() {
   };
 
   const handleSendDraft = async (id: string) => {
+    // Otimista: muda status imediatamente
+    setInvitations(prev => prev.map(i =>
+      i.id === id ? { ...i, status: 'enviado' as const, sentDate: new Date().toISOString().split('T')[0] } : i
+    ));
+
     const toastId = toast.loading('Enviando convite...');
     try {
       const res = await fetch(`${BASE_URL}/invitations/${id}/send`, {
@@ -185,6 +232,10 @@ export function Invitations() {
       setInvitations(prev => prev.map(i => i.id === id ? toInvitation(updated) : i));
       toast.success('Convite enviado com sucesso!', { id: toastId });
     } catch {
+      // Reverte status
+      setInvitations(prev => prev.map(i =>
+        i.id === id ? { ...i, status: 'rascunho' as const, sentDate: null } : i
+      ));
       toast.error('Falha ao enviar convite.', { id: toastId });
     }
   };
