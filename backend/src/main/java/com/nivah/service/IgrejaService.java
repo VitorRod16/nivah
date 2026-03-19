@@ -23,6 +23,7 @@ public class IgrejaService {
         return igrejaRepository.findAll();
     }
 
+
     public List<Igreja> findAll(String email) {
         User user = getUser(email);
         if (user.getRole() == Role.ADMIN) {

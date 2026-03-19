@@ -5,7 +5,9 @@ import com.nivah.dto.MembroIgrejaResponse;
 import com.nivah.model.*;
 import com.nivah.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.UUID;
@@ -18,6 +20,7 @@ public class MembroIgrejaService {
     private final IgrejaRepository igrejaRepository;
     private final PapelRepository papelRepository;
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
     public List<MembroIgrejaResponse> findAll(String email) {
         User user = getUser(email);
@@ -36,7 +39,20 @@ public class MembroIgrejaService {
         checkCanManage(request.getIgrejaId(), email);
 
         User usuario = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado com email: " + request.getEmail()));
+                .orElseGet(() -> {
+                    if (!StringUtils.hasText(request.getName())) {
+                        throw new IllegalArgumentException("Nome é obrigatório para cadastrar um novo membro.");
+                    }
+                    String rawPassword = StringUtils.hasText(request.getPassword())
+                            ? request.getPassword()
+                            : UUID.randomUUID().toString();
+                    return userRepository.save(User.builder()
+                            .name(request.getName())
+                            .email(request.getEmail())
+                            .password(passwordEncoder.encode(rawPassword))
+                            .role(Role.MEMBRO)
+                            .build());
+                });
 
         Igreja igreja = igrejaRepository.findById(request.getIgrejaId())
                 .orElseThrow(() -> new IllegalArgumentException("Igreja não encontrada."));

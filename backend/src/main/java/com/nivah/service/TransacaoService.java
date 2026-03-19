@@ -41,7 +41,7 @@ public class TransacaoService {
 
         Igreja igreja = igrejaRepository.findById(request.getIgrejaId())
                 .orElseThrow(() -> new IllegalArgumentException("Igreja não encontrada."));
-        if (!igreja.isDizmosAtivo()) {
+        if (Boolean.FALSE.equals(igreja.getDizmosAtivo())) {
             throw new IllegalStateException("Dízimos e ofertas estão desativados para esta igreja.");
         }
 

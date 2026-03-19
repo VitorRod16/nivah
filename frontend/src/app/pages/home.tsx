@@ -2,10 +2,12 @@ import { Calendar, Crown, BookOpen, Music, Users, Church, Clock } from 'lucide-r
 import { Card } from '../components/ui/card';
 import { useMockData } from '../context/MockDataContext';
 import { useAuth } from '../context/AuthContext';
+import { useActiveChurch } from '../context/ChurchContext';
 
 export function Home() {
-  const { events, leaders, members, ministries, studies, songs } = useMockData();
+  const { events, leaders, members, ministries, studies, songs, membrosIgreja } = useMockData();
   const { user } = useAuth();
+  const { activeIgreja } = useActiveChurch();
 
   const today = new Date();
   const upcomingEvents = events
@@ -18,6 +20,8 @@ export function Home() {
 
   const currentMember = members.find(m => m.email === user?.email);
   const currentLeader = currentMember ? leaders.find(l => l.memberId === currentMember.id) : null;
+  const activePastores = activeIgreja?.pastores ?? [];
+  const activeMembrosCount = membrosIgreja.filter(m => m.igrejaId === activeIgreja?.id).length;
 
   return (
     <div className="space-y-8">
@@ -37,7 +41,7 @@ export function Home() {
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Membros</p>
-            <p className="text-2xl font-semibold">{members.length}</p>
+            <p className="text-2xl font-semibold">{activeIgreja ? activeMembrosCount : members.length}</p>
           </div>
         </Card>
         <Card className="p-4 flex items-center gap-3">
@@ -104,29 +108,30 @@ export function Home() {
 
         {/* Current Leadership */}
         <Card className="overflow-hidden">
-          <div className="px-6 py-4 border-b border-border flex items-center gap-2">
-            <Crown className="w-5 h-5 text-primary" />
-            <h2 className="text-lg font-semibold">Liderança Atual</h2>
+          <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Crown className="w-5 h-5 text-primary" />
+              <h2 className="text-lg font-semibold">Liderança Atual</h2>
+            </div>
+            {activeIgreja && (
+              <span className="text-xs text-muted-foreground">{activeIgreja.nome}</span>
+            )}
           </div>
           <div className="divide-y divide-border">
-            {leaders.slice(0, 5).map((leader) => {
-              const member = members.find(m => m.id === leader.memberId);
-              if (!member) return null;
-              return (
-                <div key={leader.id} className="px-6 py-3">
-                  <p className="font-medium text-sm text-foreground">{member.name}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{leader.roles.join(', ')}</p>
+            {activePastores.map((pastor) => (
+              <div key={pastor.id} className="px-6 py-3 flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center text-primary-foreground text-xs font-bold shrink-0 select-none">
+                  {pastor.name.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()}
                 </div>
-              );
-            })}
-            {leaders.length === 0 && (
-              <div className="px-6 py-8 text-center text-muted-foreground text-sm">
-                Nenhuma liderança cadastrada.
+                <div>
+                  <p className="font-medium text-sm text-foreground">{pastor.name}</p>
+                  <p className="text-xs text-muted-foreground">Pastor responsável</p>
+                </div>
               </div>
-            )}
-            {leaders.length > 5 && (
-              <div className="px-6 py-3 text-xs text-muted-foreground text-center">
-                + {leaders.length - 5} líderes
+            ))}
+            {activePastores.length === 0 && (
+              <div className="px-6 py-8 text-center text-muted-foreground text-sm">
+                Nenhum pastor vinculado a esta igreja.
               </div>
             )}
           </div>

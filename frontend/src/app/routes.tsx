@@ -16,6 +16,7 @@ import { NotFound } from "./pages/not-found";
 import { Login } from "./pages/login";
 import { AuthProvider } from "./context/AuthContext";
 import { MockDataProvider } from "./context/MockDataContext";
+import { ChurchProvider } from "./context/ChurchContext";
 
 import { useAuth } from "./context/AuthContext";
 import { Loader2 } from "lucide-react";
@@ -56,7 +57,9 @@ export const router = createBrowserRouter([
       {
         element: (
           <MockDataProvider>
-            <Layout />
+            <ChurchProvider>
+              <Layout />
+            </ChurchProvider>
           </MockDataProvider>
         ),
         children: [

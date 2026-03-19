@@ -5,12 +5,16 @@ import logoImg from '../../assets/53ef4314c936ceb2d472946a347e2bbb419189ab.png';
 import { useAuth } from '../context/AuthContext';
 import { useRole } from '../hooks/useRole';
 import { useTheme } from '../context/ThemeContext';
+import { useActiveChurch } from '../context/ChurchContext';
+import { useMockData } from '../context/MockDataContext';
 import { ProfileModal } from './ProfileModal';
 
 export function Layout() {
   const location = useLocation();
   const { isAuthenticated, user, logout } = useAuth();
   const { label: userRoleLabel, isAdmin, canManage } = useRole();
+  const { activeIgreja, setActiveIgrejaId } = useActiveChurch();
+  const { igrejas } = useMockData();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -35,7 +39,7 @@ export function Layout() {
     { name: 'Início', href: '/', icon: Church, show: true },
     { name: 'Igrejas', href: '/igrejas', icon: Church, show: isAdmin },
     { name: 'Membros', href: '/membros', icon: Users, show: true },
-    { name: 'Ministérios', href: '/ministries', icon: Church, show: canManage },
+    { name: 'Ministérios', href: '/ministries', icon: Church, show: isAdmin },
     { name: 'Calendário', href: '/calendar', icon: Calendar, show: true },
     { name: 'Liderança', href: '/leadership', icon: Crown, show: canManage },
     { name: 'Convites', href: '/invitations', icon: Mail, show: canManage },
@@ -66,6 +70,24 @@ export function Layout() {
             </div>
             
             <div className="flex items-center gap-3">
+              {/* Church selector */}
+              {igrejas.length > 1 && (
+                <select
+                  value={activeIgreja?.id ?? ''}
+                  onChange={e => setActiveIgrejaId(e.target.value)}
+                  className="hidden sm:block text-xs rounded-md border border-border bg-muted px-2 py-1.5 text-foreground focus:outline-none focus:ring-2 focus:ring-ring max-w-[160px] truncate"
+                  title="Igreja ativa"
+                >
+                  {igrejas.map(ig => (
+                    <option key={ig.id} value={ig.id}>{ig.nome}</option>
+                  ))}
+                </select>
+              )}
+              {igrejas.length === 1 && activeIgreja && (
+                <span className="hidden sm:flex items-center gap-1 text-xs text-muted-foreground bg-muted px-2 py-1.5 rounded-md">
+                  <Church className="w-3 h-3" />{activeIgreja.nome}
+                </span>
+              )}
               {/* Profile dropdown */}
               <div className="relative" ref={profileMenuRef}>
                 <button

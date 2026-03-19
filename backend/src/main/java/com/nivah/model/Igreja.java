@@ -28,8 +28,8 @@ public class Igreja {
     private String descricao;
 
     @Builder.Default
-    @Column(nullable = false)
-    private boolean dizmosAtivo = true;
+    @Column(columnDefinition = "boolean DEFAULT true")
+    private Boolean dizmosAtivo = Boolean.TRUE;
 
     @Builder.Default
     @ManyToMany(fetch = FetchType.EAGER)

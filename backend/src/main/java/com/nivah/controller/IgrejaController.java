@@ -1,5 +1,6 @@
 package com.nivah.controller;
 
+import com.nivah.dto.IgrejaPublicResponse;
 import com.nivah.dto.IgrejaRequest;
 import com.nivah.model.Igreja;
 import com.nivah.service.IgrejaService;
@@ -21,9 +22,14 @@ public class IgrejaController {
     private final IgrejaService igrejaService;
 
     @GetMapping
-    public List<Igreja> getAll(@AuthenticationPrincipal UserDetails user) {
-        if (user == null) return igrejaService.findAllPublic();
-        return igrejaService.findAll(user.getUsername());
+    public ResponseEntity<?> getAll(@AuthenticationPrincipal UserDetails user) {
+        if (user == null) {
+            List<IgrejaPublicResponse> list = igrejaService.findAllPublic().stream()
+                    .map(IgrejaPublicResponse::from)
+                    .toList();
+            return ResponseEntity.ok(list);
+        }
+        return ResponseEntity.ok(igrejaService.findAll(user.getUsername()));
     }
 
     @GetMapping("/{id}")

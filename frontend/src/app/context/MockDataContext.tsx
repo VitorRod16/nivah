@@ -14,12 +14,19 @@ export type PapelInfo = {
   nome: string;
 };
 
+export type Papel = {
+  id: string;
+  nome: string;
+  igrejaId: string;
+};
+
 export type MembroIgreja = {
   id: string;
   usuarioId: string;
   nome: string;
   email: string;
   phone?: string;
+  photoUrl?: string;
   igrejaId: string;
   igrejaName: string;
   papeis: PapelInfo[];
@@ -94,7 +101,7 @@ type MockDataContextType = {
   updateIgreja: (id: string, updated: Partial<Omit<Igreja, "id" | "pastores">>) => Promise<void>;
   deleteIgreja: (id: string) => Promise<void>;
   membrosIgreja: MembroIgreja[];
-  addMembroIgreja: (email: string, igrejaId: string, phone?: string) => Promise<void>;
+  addMembroIgreja: (data: { name: string; email: string; igrejaId: string; phone?: string; password?: string }) => Promise<void>;
   removeMembroIgreja: (id: string) => Promise<void>;
   addPapelToMembro: (membroId: string, papelId: string) => Promise<void>;
   removePapelFromMembro: (membroId: string, papelId: string) => Promise<void>;
@@ -126,12 +133,15 @@ type MockDataContextType = {
   addTransacao: (t: Omit<Transacao, "id" | "criadoPor">) => Promise<void>;
   updateTransacao: (id: string, updated: Partial<Omit<Transacao, "id" | "criadoPor">>) => Promise<void>;
   deleteTransacao: (id: string) => Promise<void>;
+  papeis: Papel[];
+  addPapelIgreja: (igrejaId: string, nome: string) => Promise<Papel>;
+  deletePapelIgreja: (igrejaId: string, papelId: string) => Promise<void>;
   isLoading: boolean;
 };
 
 const MockDataContext = createContext<MockDataContextType | null>(null);
 
-const BASE_URL = "http://localhost:8080/api";
+const BASE_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:8080") + "/api";
 
 function authHeaders() {
   const token = localStorage.getItem("token");
@@ -165,6 +175,7 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
   const [studies, setStudies] = useState<Study[]>([]);
   const [songs, setSongs] = useState<WorshipSong[]>([]);
   const [transacoes, setTransacoes] = useState<Transacao[]>([]);
+  const [papeis, setPapeis] = useState<Papel[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -196,6 +207,15 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
         setStudies(st);
         setSongs(sg);
         setTransacoes(tr);
+        // Fetch papeis for each church
+        const papeisList = await Promise.all(
+          ig.map((igreja: Igreja) =>
+            apiFetch<{ id: string; nome: string }[]>(`/igrejas/${igreja.id}/papeis`)
+              .then(p => p.map(papel => ({ ...papel, igrejaId: igreja.id })))
+              .catch(() => [] as Papel[])
+          )
+        );
+        setPapeis(papeisList.flat());
       } catch (err: any) {
         if (err.message !== "UNAUTHORIZED") {
           console.error("Error loading data:", err);
@@ -224,8 +244,8 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
     setIgrejas(prev => prev.filter(ig => ig.id !== id));
   };
 
-  const addMembroIgreja = async (email: string, igrejaId: string, phone?: string) => {
-    const created = await apiFetch<MembroIgreja>("/membros", { method: "POST", body: JSON.stringify({ email, igrejaId, phone }) });
+  const addMembroIgreja = async (data: { name: string; email: string; igrejaId: string; phone?: string; password?: string }) => {
+    const created = await apiFetch<MembroIgreja>("/membros", { method: "POST", body: JSON.stringify(data) });
     setMembrosIgreja(prev => [...prev, created]);
   };
 
@@ -359,6 +379,20 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
     setTransacoes(prev => prev.filter(t => t.id !== id));
   };
 
+  const addPapelIgreja = async (igrejaId: string, nome: string): Promise<Papel> => {
+    const created = await apiFetch<{ id: string; nome: string }>(`/igrejas/${igrejaId}/papeis`, {
+      method: "POST", body: JSON.stringify({ nome }),
+    });
+    const papel: Papel = { ...created, igrejaId };
+    setPapeis(prev => [...prev, papel]);
+    return papel;
+  };
+
+  const deletePapelIgreja = async (igrejaId: string, papelId: string) => {
+    await apiFetch(`/igrejas/${igrejaId}/papeis/${papelId}`, { method: "DELETE" });
+    setPapeis(prev => prev.filter(p => p.id !== papelId));
+  };
+
   const value = useMemo(() => ({
     igrejas, addIgreja, updateIgreja, deleteIgreja,
     membrosIgreja, addMembroIgreja, removeMembroIgreja, addPapelToMembro, removePapelFromMembro,
@@ -369,9 +403,10 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
     studies, addStudy, updateStudy, deleteStudy,
     songs, addSong, updateSong, deleteSong,
     transacoes, addTransacao, updateTransacao, deleteTransacao,
+    papeis, addPapelIgreja, deletePapelIgreja,
     isLoading,
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [igrejas, membrosIgreja, ministries, members, leaders, events, studies, songs, transacoes, isLoading]);
+  }), [igrejas, membrosIgreja, ministries, members, leaders, events, studies, songs, transacoes, papeis, isLoading]);
 
   return (
     <MockDataContext.Provider value={value}>
