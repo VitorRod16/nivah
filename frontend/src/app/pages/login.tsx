@@ -6,7 +6,7 @@ import { Church, Lock, Mail, User, Building, Search, CheckCircle2, ArrowRight, P
 import logoImg from "../../assets/53ef4314c936ceb2d472946a347e2bbb419189ab.png";
 import { toast } from "sonner";
 
-const BASE_URL = "http://localhost:8080/api";
+const BASE_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:8080") + "/api";
 
 type IgrejaOption = { id: string; nome: string; cidade?: string; isPending?: boolean };
 

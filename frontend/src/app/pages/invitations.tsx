@@ -11,7 +11,7 @@ import { useMockData } from '../context/MockDataContext';
 import type { Member } from '../context/MockDataContext';
 import { toast } from 'sonner';
 
-const BASE_URL = 'http://localhost:8080/api';
+const BASE_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:8080") + "/api";
 
 type ApiInvitation = {
   id: string;
