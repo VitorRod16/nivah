@@ -2,7 +2,9 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
-  "env": {
-    "VITE_API_URL": "https://nivah-production-70a5.up.railway.app"
+  "build": {
+    "env": {
+      "VITE_API_URL": "https://nivah-production-70a5.up.railway.app"
+    }
   }
 }
