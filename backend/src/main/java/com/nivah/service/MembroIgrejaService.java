@@ -30,7 +30,11 @@ public class MembroIgrejaService {
                 List<Igreja> igrejas = igrejaRepository.findByPastoresContaining(user);
                 yield membroIgrejaRepository.findByIgrejaIn(igrejas);
             }
-            case MEMBRO -> membroIgrejaRepository.findByUsuario(user);
+            case MEMBRO -> {
+                List<Igreja> igrejas = membroIgrejaRepository.findByUsuario(user)
+                        .stream().map(MembroIgreja::getIgreja).toList();
+                yield membroIgrejaRepository.findByIgrejaIn(igrejas);
+            }
         };
         return membros.stream().map(MembroIgrejaResponse::from).toList();
     }
