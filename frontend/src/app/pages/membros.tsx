@@ -6,6 +6,7 @@ import { useMockData, MembroIgreja } from '../context/MockDataContext';
 import { useActiveChurch } from '../context/ChurchContext';
 import { useRole } from '../hooks/useRole';
 import { toast } from 'sonner';
+import { MemberViewModal } from '../components/MemberViewModal';
 
 type NewMembroForm = {
   name: string; email: string; phone: string; password: string; igrejaId: string;
@@ -31,6 +32,9 @@ export function Membros() {
   // Role management modal
   const [roleTarget, setRoleTarget] = useState<MembroIgreja | null>(null);
   const [roleLoading, setRoleLoading] = useState(false);
+
+  // Member view modal
+  const [viewTarget, setViewTarget] = useState<MembroIgreja | null>(null);
 
   // Papeis management modal (PASTOR only)
   const [showPapeis, setShowPapeis] = useState(false);
@@ -137,6 +141,12 @@ export function Membros() {
   const initials = (name: string) =>
     name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
 
+  const roleLabel = (role?: string) => {
+    if (role === 'ADMIN') return 'Administrador';
+    if (role === 'PASTOR') return 'Pastor';
+    return null;
+  };
+
   const colSpan = canManage
     ? (isAdmin ? 6 : isPastor ? 6 : 5)
     : (isAdmin ? 5 : 4);
@@ -242,7 +252,10 @@ export function Membros() {
                   className={`border-b border-border last:border-0 hover:bg-muted/20 transition-colors ${i % 2 !== 0 ? 'bg-muted/10' : ''}`}
                 >
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setViewTarget(m)}
+                      className="flex items-center gap-3 hover:opacity-80 transition-opacity text-left"
+                    >
                       {m.photoUrl ? (
                         <img src={m.photoUrl} alt={m.nome} className="w-8 h-8 rounded-full object-cover shrink-0" />
                       ) : (
@@ -254,7 +267,7 @@ export function Membros() {
                         <p className="font-medium text-foreground">{m.nome}</p>
                         <p className="text-xs text-muted-foreground sm:hidden">{m.email}</p>
                       </div>
-                    </div>
+                    </button>
                   </td>
                   <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">
                     <span className="flex items-center gap-1.5"><Mail className="w-3.5 h-3.5 shrink-0" />{m.email}</span>
@@ -266,14 +279,19 @@ export function Membros() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1">
-                      {m.papeis.length > 0
-                        ? m.papeis.map(p => (
-                            <span key={p.id} className="inline-flex px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-medium">
-                              {p.nome}
-                            </span>
-                          ))
-                        : <span className="text-muted-foreground/40 text-xs">—</span>
-                      }
+                      {roleLabel(m.role) && (
+                        <span className="inline-flex px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs font-medium">
+                          {roleLabel(m.role)}
+                        </span>
+                      )}
+                      {m.papeis.map(p => (
+                        <span key={p.id} className="inline-flex px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-medium">
+                          {p.nome}
+                        </span>
+                      ))}
+                      {!roleLabel(m.role) && m.papeis.length === 0 && (
+                        <span className="text-muted-foreground/40 text-xs">—</span>
+                      )}
                     </div>
                   </td>
                   {isAdmin && (
@@ -431,6 +449,9 @@ export function Membros() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Member view modal */}
+      <MemberViewModal member={viewTarget} onClose={() => setViewTarget(null)} />
 
       {/* Papeis management modal */}
       <Dialog open={showPapeis} onOpenChange={v => { if (!v) setShowPapeis(false); }}>

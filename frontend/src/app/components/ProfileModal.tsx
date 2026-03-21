@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Pencil, Check, X, Camera } from 'lucide-react';
+import { Pencil, Check, X, Camera, MessageCircle } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -19,6 +19,7 @@ export function ProfileModal({ open, onClose, roleLabel }: ProfileModalProps) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(user?.name ?? '');
   const [email, setEmail] = useState(user?.email ?? '');
+  const [status, setStatus] = useState(user?.status ?? '');
   const [saving, setSaving] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [error, setError] = useState('');
@@ -28,6 +29,7 @@ export function ProfileModal({ open, onClose, roleLabel }: ProfileModalProps) {
     if (open) {
       setName(user?.name ?? '');
       setEmail(user?.email ?? '');
+      setStatus(user?.status ?? '');
       setEditing(false);
       setError('');
     }
@@ -44,7 +46,7 @@ export function ProfileModal({ open, onClose, roleLabel }: ProfileModalProps) {
     }
     setSaving(true);
     setError('');
-    const result = await updateUser({ name: name.trim(), email: email.trim() });
+    const result = await updateUser({ name: name.trim(), email: email.trim(), status: status.trim() || undefined });
     setSaving(false);
     if (result.success) {
       setEditing(false);
@@ -56,6 +58,7 @@ export function ProfileModal({ open, onClose, roleLabel }: ProfileModalProps) {
   const handleCancel = () => {
     setName(user?.name ?? '');
     setEmail(user?.email ?? '');
+    setStatus(user?.status ?? '');
     setEditing(false);
     setError('');
   };
@@ -147,6 +150,21 @@ export function ProfileModal({ open, onClose, roleLabel }: ProfileModalProps) {
                 <label className="text-xs text-muted-foreground font-medium">Função</label>
                 <p className="px-3 py-2 text-sm text-muted-foreground bg-muted rounded-md">{roleLabel}</p>
               </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-muted-foreground font-medium">Status</label>
+                <div className="relative">
+                  <MessageCircle className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <input
+                    type="text"
+                    placeholder="Sua mensagem de status..."
+                    maxLength={120}
+                    className="w-full pl-9 pr-3 py-2 rounded-md border border-border bg-input-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    value={status}
+                    onChange={e => setStatus(e.target.value)}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground text-right">{status.length}/120</p>
+              </div>
               {error && <p className="text-xs text-destructive">{error}</p>}
               <div className="flex gap-2 justify-end mt-1">
                 <button
@@ -179,6 +197,15 @@ export function ProfileModal({ open, onClose, roleLabel }: ProfileModalProps) {
                   <span className="text-xs text-muted-foreground font-medium">Função</span>
                   <span className="text-sm text-foreground">{roleLabel}</span>
                 </div>
+                {user?.status && (
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-xs text-muted-foreground font-medium">Status</span>
+                    <span className="flex items-center gap-1.5 text-sm text-foreground italic">
+                      <MessageCircle className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                      {user.status}
+                    </span>
+                  </div>
+                )}
               </div>
               {error && <p className="text-xs text-destructive">{error}</p>}
               <div className="flex justify-end mt-1">

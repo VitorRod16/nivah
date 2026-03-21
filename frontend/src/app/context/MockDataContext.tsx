@@ -27,6 +27,8 @@ export type MembroIgreja = {
   email: string;
   phone?: string;
   photoUrl?: string;
+  status?: string;
+  role?: string;
   igrejaId: string;
   igrejaName: string;
   papeis: PapelInfo[];

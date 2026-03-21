@@ -8,6 +8,7 @@ export type User = {
   email: string;
   role: UserRole;
   photoUrl?: string;
+  status?: string;
 };
 
 type AuthContextType = {
@@ -16,7 +17,7 @@ type AuthContextType = {
   login: (email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
   register: (name: string, email: string, password?: string, role?: UserRole) => Promise<{ success: boolean; error?: string; token?: string; userData?: User }>;
   finalizeAuth: (user: User, token: string) => void;
-  updateUser: (data: { name: string; email: string }) => Promise<{ success: boolean; error?: string }>;
+  updateUser: (data: { name: string; email: string; status?: string }) => Promise<{ success: boolean; error?: string }>;
   updatePhoto: (photoUrl: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   isLoadingAuth: boolean;
@@ -40,7 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
         if (res.ok) {
           const data = await res.json();
-          setUser({ id: data.id, name: data.name, email: data.email, role: data.role ?? "MEMBRO", photoUrl: data.photoUrl });
+          setUser({ id: data.id, name: data.name, email: data.email, role: data.role ?? "MEMBRO", photoUrl: data.photoUrl, status: data.status });
         } else {
           localStorage.removeItem("token");
         }
@@ -64,7 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = await res.json();
       if (!res.ok) return { success: false, error: "E-mail ou senha incorretos." };
       localStorage.setItem("token", data.token);
-      setUser({ id: data.id, name: data.name, email: data.email, role: data.role ?? "MEMBRO", photoUrl: data.photoUrl });
+      setUser({ id: data.id, name: data.name, email: data.email, role: data.role ?? "MEMBRO", photoUrl: data.photoUrl, status: data.status });
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message };
@@ -97,7 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(user);
   };
 
-  const updateUser = async (data: { name: string; email: string }) => {
+  const updateUser = async (data: { name: string; email: string; status?: string }) => {
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(`${BASE_URL}/auth/me`, {

@@ -17,6 +17,7 @@ public class MembroIgrejaResponse {
     private String email;
     private String phone;
     private String photoUrl;
+    private String role;
     private UUID igrejaId;
     private String igrejaName;
     private List<PapelInfo> papeis;
@@ -31,6 +32,7 @@ public class MembroIgrejaResponse {
                 m.getUsuario().getEmail(),
                 m.getPhone(),
                 m.getUsuario().getPhotoUrl(),
+                m.getUsuario().getRole().name(),
                 m.getIgreja().getId(),
                 m.getIgreja().getNome(),
                 m.getPapeis().stream()
