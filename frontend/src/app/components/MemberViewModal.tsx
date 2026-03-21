@@ -69,18 +69,17 @@ export function MemberViewModal({ member, onClose }: MemberViewModalProps) {
           </div>
 
           {/* Funções */}
-          {(member.role === 'ADMIN' || member.role === 'PASTOR' || member.papeis.length > 0) && (
+          {(member.role || member.papeis.length > 0) && (
             <div className="w-full">
               <p className="text-xs text-muted-foreground font-medium mb-2">Funções</p>
               <div className="flex flex-wrap gap-1.5">
-                {member.role === 'ADMIN' && (
-                  <span className="inline-flex px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs font-medium">
-                    Administrador
-                  </span>
-                )}
-                {member.role === 'PASTOR' && (
-                  <span className="inline-flex px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs font-medium">
-                    Pastor
+                {member.role && (
+                  <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${
+                    member.role === 'MEMBRO'
+                      ? 'bg-muted text-muted-foreground'
+                      : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                  }`}>
+                    {member.role === 'ADMIN' ? 'Administrador' : member.role === 'PASTOR' ? 'Pastor' : 'Membro'}
                   </span>
                 )}
                 {member.papeis.map(p => (

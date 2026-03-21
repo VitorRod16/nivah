@@ -144,6 +144,7 @@ export function Membros() {
   const roleLabel = (role?: string) => {
     if (role === 'ADMIN') return 'Administrador';
     if (role === 'PASTOR') return 'Pastor';
+    if (role === 'MEMBRO') return 'Membro';
     return null;
   };
 
@@ -280,7 +281,11 @@ export function Membros() {
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1">
                       {roleLabel(m.role) && (
-                        <span className="inline-flex px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs font-medium">
+                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
+                          m.role === 'MEMBRO'
+                            ? 'bg-muted text-muted-foreground'
+                            : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                        }`}>
                           {roleLabel(m.role)}
                         </span>
                       )}
