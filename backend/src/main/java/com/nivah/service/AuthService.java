@@ -63,6 +63,7 @@ public class AuthService {
                 .email(user.getEmail())
                 .role(user.getRole().name())
                 .photoUrl(user.getPhotoUrl())
+                .status(user.getStatus())
                 .build();
     }
 
@@ -85,6 +86,7 @@ public class AuthService {
                 .email(user.getEmail())
                 .role(user.getRole().name())
                 .photoUrl(user.getPhotoUrl())
+                .status(user.getStatus())
                 .build();
     }
 
@@ -99,6 +101,29 @@ public class AuthService {
                 .email(user.getEmail())
                 .role(user.getRole().name())
                 .photoUrl(user.getPhotoUrl())
+                .status(user.getStatus())
+                .build();
+    }
+
+    public AuthResponse updateUser(String email, String name, String newEmail, String status) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalStateException("User not found: " + email));
+        if (StringUtils.hasText(name)) user.setName(name);
+        if (StringUtils.hasText(newEmail) && !newEmail.equals(email)) {
+            if (userRepository.existsByEmail(newEmail))
+                throw new IllegalArgumentException("E-mail já está em uso.");
+            user.setEmail(newEmail);
+        }
+        user.setStatus(status);
+        user = userRepository.save(user);
+        return AuthResponse.builder()
+                .token(null)
+                .id(user.getId())
+                .name(user.getName())
+                .email(user.getEmail())
+                .role(user.getRole().name())
+                .photoUrl(user.getPhotoUrl())
+                .status(user.getStatus())
                 .build();
     }
 
@@ -114,6 +139,7 @@ public class AuthService {
                 .email(user.getEmail())
                 .role(user.getRole().name())
                 .photoUrl(user.getPhotoUrl())
+                .status(user.getStatus())
                 .build();
     }
 }

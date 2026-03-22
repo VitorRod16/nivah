@@ -46,6 +46,21 @@ public class AuthController {
         return ResponseEntity.ok(response);
     }
 
+    @PutMapping("/me")
+    public ResponseEntity<?> updateMe(@RequestBody Map<String, String> body, @AuthenticationPrincipal UserDetails userDetails) {
+        try {
+            AuthResponse response = authService.updateUser(
+                    userDetails.getUsername(),
+                    body.get("name"),
+                    body.get("email"),
+                    body.get("status")
+            );
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
     @PutMapping("/me/photo")
     public ResponseEntity<?> updatePhoto(@RequestBody Map<String, String> body, @AuthenticationPrincipal UserDetails userDetails) {
         try {

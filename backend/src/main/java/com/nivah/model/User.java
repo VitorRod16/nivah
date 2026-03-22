@@ -35,4 +35,7 @@ public class User {
 
     @Column(columnDefinition = "TEXT")
     private String photoUrl;
+
+    @Column(length = 120)
+    private String status;
 }
