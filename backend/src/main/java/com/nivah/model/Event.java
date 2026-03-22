@@ -38,6 +38,12 @@ public class Event {
     private boolean cancelled = false;
 
     @Builder.Default
+    @Column(columnDefinition = "boolean default false")
+    private boolean allowInscriptions = false;
+
+    private Integer maxInscriptions;
+
+    @Builder.Default
     @ElementCollection
     @CollectionTable(name = "event_ministry_ids", joinColumns = @JoinColumn(name = "event_id"))
     @Column(name = "ministry_id")

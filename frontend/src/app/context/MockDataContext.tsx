@@ -80,6 +80,10 @@ export type EventType = {
   allMinistries: boolean;
   ministryIds: string[];
   cancelled?: boolean;
+  allowInscriptions?: boolean;
+  maxInscriptions?: number;
+  inscricoesCount?: number;
+  userInscrito?: boolean;
 };
 
 export type Study = {
@@ -123,6 +127,8 @@ type MockDataContextType = {
   addEvent: (e: Omit<EventType, "id">) => Promise<void>;
   updateEvent: (id: string, updated: Partial<Omit<EventType, "id">>) => Promise<void>;
   deleteEvent: (id: string) => Promise<void>;
+  inscreverEvento: (id: string) => Promise<void>;
+  desinscreverEvento: (id: string) => Promise<void>;
   studies: Study[];
   addStudy: (s: Omit<Study, "id">) => Promise<void>;
   updateStudy: (id: string, updated: Partial<Omit<Study, "id">>) => Promise<void>;
@@ -333,6 +339,16 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
     setEvents(prev => prev.filter(e => e.id !== id));
   };
 
+  const inscreverEvento = async (id: string) => {
+    const updated = await apiFetch<EventType>(`/events/${id}/inscricoes`, { method: "POST" });
+    setEvents(prev => prev.map(e => e.id === id ? { ...e, ...updated } : e));
+  };
+
+  const desinscreverEvento = async (id: string) => {
+    const updated = await apiFetch<EventType>(`/events/${id}/inscricoes`, { method: "DELETE" });
+    setEvents(prev => prev.map(e => e.id === id ? { ...e, ...updated } : e));
+  };
+
   const addStudy = async (s: Omit<Study, "id">) => {
     const created = await apiFetch<Study>("/studies", { method: "POST", body: JSON.stringify(s) });
     setStudies(prev => [...prev, created]);
@@ -401,7 +417,7 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
     ministries, addMinistry, updateMinistry, deleteMinistry,
     members, addMember, updateMember, deleteMember,
     leaders, addLeader, updateLeader, deleteLeader,
-    events, addEvent, updateEvent, deleteEvent,
+    events, addEvent, updateEvent, deleteEvent, inscreverEvento, desinscreverEvento,
     studies, addStudy, updateStudy, deleteStudy,
     songs, addSong, updateSong, deleteSong,
     transacoes, addTransacao, updateTransacao, deleteTransacao,
