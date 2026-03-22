@@ -95,9 +95,13 @@ export function Layout() {
                   className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-accent transition-colors"
                   aria-label="Menu do perfil"
                 >
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center text-primary-foreground text-xs font-bold select-none">
-                    {user?.name?.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() ?? '?'}
-                  </div>
+                  {user?.photoUrl ? (
+                    <img src={user.photoUrl} alt={user.name} className="w-8 h-8 rounded-full object-cover shrink-0" />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center text-primary-foreground text-xs font-bold select-none shrink-0">
+                      {user?.name?.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() ?? '?'}
+                    </div>
+                  )}
                   <div className="text-right hidden md:block">
                     <p className="text-sm font-medium text-foreground leading-tight">
                       {user?.name}
