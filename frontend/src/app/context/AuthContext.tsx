@@ -27,6 +27,12 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 const BASE_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:8080") + "/api";
 
+async function safeJson(res: Response): Promise<any> {
+  const text = await res.text();
+  if (!text) return {};
+  try { return JSON.parse(text); } catch { return {}; }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
@@ -62,8 +68,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
-      const data = await res.json();
-      if (!res.ok) return { success: false, error: "E-mail ou senha incorretos." };
+      const data = await safeJson(res);
+      if (!res.ok) return { success: false, error: data.message || "E-mail ou senha incorretos." };
       localStorage.setItem("token", data.token);
       setUser({ id: data.id, name: data.name, email: data.email, role: data.role ?? "MEMBRO", photoUrl: data.photoUrl, status: data.status });
       return { success: true };
@@ -80,7 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, email, password, role }),
       });
-      const data = await res.json();
+      const data = await safeJson(res);
       if (!res.ok) {
         let errorMsg = data.message || "Erro ao registrar usuário.";
         if (errorMsg.includes("already")) errorMsg = "Este e-mail já está em uso.";
@@ -106,8 +112,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(data),
       });
-      if (!res.ok) return { success: false, error: "Erro ao atualizar perfil." };
-      const updated = await res.json();
+      const updated = await safeJson(res);
+      if (!res.ok) return { success: false, error: updated.error || "Erro ao atualizar perfil." };
       setUser(prev => prev ? { ...prev, ...updated } : prev);
       return { success: true };
     } catch {
