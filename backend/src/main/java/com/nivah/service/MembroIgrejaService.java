@@ -42,7 +42,8 @@ public class MembroIgrejaService {
     public MembroIgrejaResponse add(MembroIgrejaRequest request, String email) {
         checkCanManage(request.getIgrejaId(), email);
 
-        User usuario = userRepository.findByEmail(request.getEmail())
+        String membroEmail = request.getEmail().trim().toLowerCase();
+        User usuario = userRepository.findByEmail(membroEmail)
                 .orElseGet(() -> {
                     if (!StringUtils.hasText(request.getName())) {
                         throw new IllegalArgumentException("Nome é obrigatório para cadastrar um novo membro.");
@@ -52,7 +53,7 @@ public class MembroIgrejaService {
                             : UUID.randomUUID().toString();
                     return userRepository.save(User.builder()
                             .name(request.getName())
-                            .email(request.getEmail())
+                            .email(membroEmail)
                             .password(passwordEncoder.encode(rawPassword))
                             .role(Role.MEMBRO)
                             .build());

@@ -351,7 +351,7 @@ export function Membros() {
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input type="email" placeholder="joao@email.com" value={form.email}
-                  onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                  onChange={e => setForm(f => ({ ...f, email: e.target.value.toLowerCase() }))}
                   className="w-full pl-9 pr-3 py-2 rounded-md border border-border bg-input text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
               </div>
             </div>

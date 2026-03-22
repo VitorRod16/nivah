@@ -26,8 +26,9 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
 
     public AuthResponse signup(SignupRequest request) {
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new IllegalArgumentException("Email already registered: " + request.getEmail());
+        String email = request.getEmail().trim().toLowerCase();
+        if (userRepository.existsByEmail(email)) {
+            throw new IllegalArgumentException("Email already registered: " + email);
         }
 
         Role role = Role.MEMBRO;
@@ -41,7 +42,7 @@ public class AuthService {
 
         User user = User.builder()
                 .name(request.getName())
-                .email(request.getEmail())
+                .email(email)
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role(role)
                 .build();
@@ -69,7 +70,7 @@ public class AuthService {
 
     public AuthResponse login(LoginRequest request) {
         Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
+                new UsernamePasswordAuthenticationToken(request.getEmail().trim().toLowerCase(), request.getPassword())
         );
 
         UserDetails userDetails = (UserDetails) authentication.getPrincipal();
@@ -109,10 +110,13 @@ public class AuthService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalStateException("User not found: " + email));
         if (StringUtils.hasText(name)) user.setName(name);
-        if (StringUtils.hasText(newEmail) && !newEmail.equals(email)) {
-            if (userRepository.existsByEmail(newEmail))
-                throw new IllegalArgumentException("E-mail já está em uso.");
-            user.setEmail(newEmail);
+        if (StringUtils.hasText(newEmail)) {
+            String normalizedNew = newEmail.trim().toLowerCase();
+            if (!normalizedNew.equals(email)) {
+                if (userRepository.existsByEmail(normalizedNew))
+                    throw new IllegalArgumentException("E-mail já está em uso.");
+                user.setEmail(normalizedNew);
+            }
         }
         user.setStatus(status);
         user = userRepository.save(user);
