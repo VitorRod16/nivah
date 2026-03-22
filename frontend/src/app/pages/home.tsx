@@ -3,7 +3,7 @@ import { Card } from '../components/ui/card';
 import { useMockData } from '../context/MockDataContext';
 import { useAuth } from '../context/AuthContext';
 import { useActiveChurch } from '../context/ChurchContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 
 export function Home() {
   const { events, leaders, members, ministries, studies, songs, membrosIgreja } = useMockData();
