@@ -3,11 +3,13 @@ import { Card } from '../components/ui/card';
 import { useMockData } from '../context/MockDataContext';
 import { useAuth } from '../context/AuthContext';
 import { useActiveChurch } from '../context/ChurchContext';
+import { useNavigate } from 'react-router-dom';
 
 export function Home() {
   const { events, leaders, members, ministries, studies, songs, membrosIgreja } = useMockData();
   const { user } = useAuth();
   const { activeIgreja } = useActiveChurch();
+  const navigate = useNavigate();
 
   const today = new Date();
   const upcomingEvents = events
@@ -35,7 +37,7 @@ export function Home() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-4 flex items-center gap-3">
+        <Card onClick={() => navigate('/membros')} className="p-4 flex items-center gap-3 cursor-pointer hover:bg-accent transition-colors">
           <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center shrink-0">
             <Users className="w-5 h-5 text-white" />
           </div>
@@ -44,7 +46,7 @@ export function Home() {
             <p className="text-2xl font-semibold">{activeIgreja ? activeMembrosCount : members.length}</p>
           </div>
         </Card>
-        <Card className="p-4 flex items-center gap-3">
+        <Card onClick={() => navigate('/ministries')} className="p-4 flex items-center gap-3 cursor-pointer hover:bg-accent transition-colors">
           <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center shrink-0">
             <Church className="w-5 h-5 text-white" />
           </div>
@@ -53,7 +55,7 @@ export function Home() {
             <p className="text-2xl font-semibold">{ministries.length}</p>
           </div>
         </Card>
-        <Card className="p-4 flex items-center gap-3">
+        <Card onClick={() => navigate('/studies')} className="p-4 flex items-center gap-3 cursor-pointer hover:bg-accent transition-colors">
           <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center shrink-0">
             <BookOpen className="w-5 h-5 text-white" />
           </div>
@@ -62,7 +64,7 @@ export function Home() {
             <p className="text-2xl font-semibold">{studies.length}</p>
           </div>
         </Card>
-        <Card className="p-4 flex items-center gap-3">
+        <Card onClick={() => navigate('/worship')} className="p-4 flex items-center gap-3 cursor-pointer hover:bg-accent transition-colors">
           <div className="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center shrink-0">
             <Music className="w-5 h-5 text-white" />
           </div>
