@@ -263,14 +263,6 @@ export function Layout() {
         <Outlet />
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-border bg-card mt-auto shrink-0">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <p className="text-center text-sm text-muted-foreground">
-            © 2026 Niva - Sistema de Gestão para Igrejas e Ministérios
-          </p>
-        </div>
-      </footer>
     </div>
   );
 }
