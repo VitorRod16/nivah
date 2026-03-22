@@ -2,8 +2,11 @@ package com.nivah.controller;
 
 import com.nivah.model.Study;
 import com.nivah.repository.StudyRepository;
+import com.nivah.service.ChurchAccessService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -15,10 +18,12 @@ import java.util.UUID;
 public class StudyController {
 
     private final StudyRepository studyRepository;
+    private final ChurchAccessService churchAccessService;
 
     @GetMapping
-    public ResponseEntity<List<Study>> getAll() {
-        return ResponseEntity.ok(studyRepository.findAll());
+    public ResponseEntity<List<Study>> getAll(@AuthenticationPrincipal UserDetails userDetails) {
+        List<UUID> igrejaIds = churchAccessService.getAccessibleIgrejaIds(userDetails.getUsername());
+        return ResponseEntity.ok(studyRepository.findByIgrejaIdIn(igrejaIds));
     }
 
     @PostMapping

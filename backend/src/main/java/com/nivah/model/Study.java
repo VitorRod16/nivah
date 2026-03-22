@@ -24,4 +24,7 @@ public class Study {
 
     @Column(columnDefinition = "TEXT")
     private String content;
+
+    @Column(name = "igreja_id")
+    private UUID igrejaId;
 }

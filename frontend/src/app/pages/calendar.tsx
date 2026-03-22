@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useMockData } from "../context/MockDataContext";
 import { useAuth } from "../context/AuthContext";
 import { useRole } from "../hooks/useRole";
+import { useActiveChurch } from "../context/ChurchContext";
 import { Card } from "../components/ui/card";
 import {
   Calendar as CalendarIcon, Plus, Clock, Info, Check, Church, XCircle,
@@ -66,6 +67,7 @@ export function Calendar() {
   const { events, addEvent, updateEvent, inscreverEvento, desinscreverEvento, ministries } = useMockData();
   const { user } = useAuth();
   const { canManage } = useRole();
+  const { activeIgreja } = useActiveChurch();
 
   const [isAdding, setIsAdding] = useState(false);
   const [view, setView] = useState<any>(Views.MONTH);
@@ -119,6 +121,7 @@ export function Calendar() {
       ministryIds: allMinistries ? [] : selectedMinistries,
       allowInscriptions,
       maxInscriptions: allowInscriptions && maxInscriptions ? parseInt(maxInscriptions) : undefined,
+      igrejaId: activeIgreja?.id,
     });
 
     toast.success("Evento criado!");

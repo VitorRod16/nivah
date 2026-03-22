@@ -29,6 +29,9 @@ public class Event {
 
     private String description;
 
+    @Column(name = "igreja_id")
+    private UUID igrejaId;
+
     @Builder.Default
     @Column(columnDefinition = "boolean default false")
     private boolean allMinistries = false;

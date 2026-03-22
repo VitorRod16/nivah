@@ -84,6 +84,7 @@ export type EventType = {
   maxInscriptions?: number;
   inscricoesCount?: number;
   userInscrito?: boolean;
+  igrejaId?: string;
 };
 
 export type Study = {
@@ -91,6 +92,7 @@ export type Study = {
   title: string;
   author: string;
   content: string;
+  igrejaId?: string;
 };
 
 export type WorshipSong = {
@@ -99,6 +101,7 @@ export type WorshipSong = {
   artist: string;
   link: string;
   lyrics?: string;
+  igrejaId?: string;
 };
 
 type MockDataContextType = {

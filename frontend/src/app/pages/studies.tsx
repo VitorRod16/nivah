@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { useMockData, Study } from "../context/MockDataContext";
+import { useActiveChurch } from "../context/ChurchContext";
 import { Card } from "../components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { BookOpen, Plus, User, AlignLeft, X } from "lucide-react";
 
 export function Studies() {
   const { studies, addStudy } = useMockData();
+  const { activeIgreja } = useActiveChurch();
   const [isAdding, setIsAdding] = useState(false);
   const [selectedStudy, setSelectedStudy] = useState<Study | null>(null);
 
@@ -16,7 +18,7 @@ export function Studies() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !content) return;
-    addStudy({ title, author, content });
+    addStudy({ title, author, content, igrejaId: activeIgreja?.id });
     setTitle("");
     setAuthor("");
     setContent("");

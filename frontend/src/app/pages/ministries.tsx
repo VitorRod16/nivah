@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useMockData } from "../context/MockDataContext";
+import { useActiveChurch } from "../context/ChurchContext";
 import { Card } from "../components/ui/card";
 import { Church, Plus, MapPin, Edit2, Trash2, User } from "lucide-react";
 
 export function Ministries() {
   const { ministries, addMinistry, updateMinistry, deleteMinistry } = useMockData();
+  const { activeIgreja } = useActiveChurch();
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   
@@ -45,7 +47,7 @@ export function Ministries() {
     if (editingId) {
       updateMinistry(editingId, { name, description, city, pastor });
     } else {
-      addMinistry({ name, description, city, pastor });
+      addMinistry({ name, description, city, pastor, igrejaId: activeIgreja?.id });
     }
     resetForm();
   };

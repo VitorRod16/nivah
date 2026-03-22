@@ -7,6 +7,7 @@ import com.nivah.model.User;
 import com.nivah.repository.EventRepository;
 import com.nivah.repository.InscriptionRepository;
 import com.nivah.repository.UserRepository;
+import com.nivah.service.ChurchAccessService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -26,10 +27,12 @@ public class EventController {
     private final EventRepository eventRepository;
     private final InscriptionRepository inscriptionRepository;
     private final UserRepository userRepository;
+    private final ChurchAccessService churchAccessService;
 
     @GetMapping
     public ResponseEntity<List<EventResponse>> getAll(@AuthenticationPrincipal UserDetails userDetails) {
-        List<Event> events = eventRepository.findAll();
+        List<java.util.UUID> igrejaIds = churchAccessService.getAccessibleIgrejaIds(userDetails.getUsername());
+        List<Event> events = eventRepository.findByIgrejaIdIn(igrejaIds);
         Optional<User> currentUser = userDetails != null
                 ? userRepository.findByEmail(userDetails.getUsername())
                 : Optional.empty();

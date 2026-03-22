@@ -26,4 +26,7 @@ public class Song {
 
     @Column(columnDefinition = "TEXT")
     private String lyrics;
+
+    @Column(name = "igreja_id")
+    private UUID igrejaId;
 }

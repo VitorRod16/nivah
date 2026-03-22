@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useMockData } from "../context/MockDataContext";
+import { useActiveChurch } from "../context/ChurchContext";
 import { Card } from "../components/ui/card";
 import { Music, Plus, Mic, Link as LinkIcon, ExternalLink, FileText, ChevronDown, ChevronUp } from "lucide-react";
 
@@ -64,6 +65,7 @@ function SongCard({ song }: { song: any }) {
 
 export function Worship() {
   const { songs, addSong } = useMockData();
+  const { activeIgreja } = useActiveChurch();
   const [isAdding, setIsAdding] = useState(false);
 
   const [title, setTitle] = useState("");
@@ -74,7 +76,7 @@ export function Worship() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title) return;
-    addSong({ title, artist, link, lyrics });
+    addSong({ title, artist, link, lyrics, igrejaId: activeIgreja?.id });
     setTitle("");
     setArtist("");
     setLink("");
