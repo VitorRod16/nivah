@@ -22,7 +22,11 @@ public class StudyController {
 
     @GetMapping
     public ResponseEntity<List<Study>> getAll(@AuthenticationPrincipal UserDetails userDetails) {
-        List<UUID> igrejaIds = churchAccessService.getAccessibleIgrejaIds(userDetails.getUsername());
+        String email = userDetails.getUsername();
+        if (churchAccessService.isAdmin(email)) {
+            return ResponseEntity.ok(studyRepository.findAll());
+        }
+        List<UUID> igrejaIds = churchAccessService.getAccessibleIgrejaIds(email);
         return ResponseEntity.ok(studyRepository.findByIgrejaIdIn(igrejaIds));
     }
 

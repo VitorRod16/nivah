@@ -22,7 +22,11 @@ public class MinistryController {
 
     @GetMapping
     public ResponseEntity<List<Ministry>> getAll(@AuthenticationPrincipal UserDetails userDetails) {
-        List<UUID> igrejaIds = churchAccessService.getAccessibleIgrejaIds(userDetails.getUsername());
+        String email = userDetails.getUsername();
+        if (churchAccessService.isAdmin(email)) {
+            return ResponseEntity.ok(ministryRepository.findAll());
+        }
+        List<UUID> igrejaIds = churchAccessService.getAccessibleIgrejaIds(email);
         return ResponseEntity.ok(ministryRepository.findByIgrejaIdIn(igrejaIds));
     }
 

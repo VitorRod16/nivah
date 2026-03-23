@@ -31,8 +31,10 @@ public class EventController {
 
     @GetMapping
     public ResponseEntity<List<EventResponse>> getAll(@AuthenticationPrincipal UserDetails userDetails) {
-        List<java.util.UUID> igrejaIds = churchAccessService.getAccessibleIgrejaIds(userDetails.getUsername());
-        List<Event> events = eventRepository.findByIgrejaIdIn(igrejaIds);
+        String email = userDetails.getUsername();
+        List<Event> events = churchAccessService.isAdmin(email)
+                ? eventRepository.findAll()
+                : eventRepository.findByIgrejaIdIn(churchAccessService.getAccessibleIgrejaIds(email));
         Optional<User> currentUser = userDetails != null
                 ? userRepository.findByEmail(userDetails.getUsername())
                 : Optional.empty();
