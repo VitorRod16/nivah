@@ -248,9 +248,10 @@ export function Calendar() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1 md:col-span-2">
                 <label className="text-sm font-medium">Título *</label>
-                <input required type="text" value={title} onChange={e => setTitle(e.target.value)}
+                <input required type="text" maxLength={30} value={title} onChange={e => setTitle(e.target.value)}
                   className="w-full px-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                   placeholder="Ex: Culto de Jovens" />
+                <p className="text-xs text-muted-foreground text-right">{title.length}/30</p>
               </div>
 
               {/* Início */}
