@@ -6,7 +6,7 @@ import { useActiveChurch } from "../context/ChurchContext";
 import { Card } from "../components/ui/card";
 import {
   Calendar as CalendarIcon, Plus, Clock, Info, Check, Church, XCircle,
-  Users, UserCheck, UserX, ChevronDown, ChevronUp,
+  Users, UserCheck, UserX, ChevronDown, ChevronUp, Tent,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Calendar as BigCalendar, dateFnsLocalizer, Views } from 'react-big-calendar';
@@ -89,11 +89,20 @@ export function Calendar() {
   const [selectedMinistries, setSelectedMinistries] = useState<string[]>([]);
   const [allowInscriptions, setAllowInscriptions] = useState(false);
   const [maxInscriptions, setMaxInscriptions] = useState("");
+  const [tipoEvento, setTipoEvento] = useState<"NORMAL" | "ACAMPAMENTO">("NORMAL");
+  const [vagasMasculino, setVagasMasculino] = useState("");
+  const [vagasFeminino, setVagasFeminino] = useState("");
+  const [quantidadeQuartos, setQuantidadeQuartos] = useState("");
+  // Camp inscription modal state
+  const [showCampModal, setShowCampModal] = useState(false);
+  const [campTipo, setCampTipo] = useState<"JOVEM" | "APOIO" | "APOIO_CASAL">("JOVEM");
+  const [campSexo, setCampSexo] = useState<"MASCULINO" | "FEMININO">("MASCULINO");
 
   const resetForm = () => {
     setTitle(""); setStartDate(""); setStartTime(""); setEndDate(""); setEndTime("");
     setDescription(""); setAllMinistries(true); setSelectedMinistries([]);
     setAllowInscriptions(false); setMaxInscriptions("");
+    setTipoEvento("NORMAL"); setVagasMasculino(""); setVagasFeminino(""); setQuantidadeQuartos("");
   };
 
   const toggleMinistry = (id: string) =>
@@ -101,27 +110,37 @@ export function Calendar() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title || !startDate || !startTime || !endDate || !endTime) return;
+    if (!title || !startDate || !startTime) return;
     if (!allMinistries && selectedMinistries.length === 0) return;
 
     const startDateTime = `${startDate}T${startTime}:00`;
-    const endDateTime = `${endDate}T${endTime}:00`;
+    let endDateTime: string | undefined = undefined;
 
-    if (new Date(endDateTime) <= new Date(startDateTime)) {
-      toast.error("A data/hora de término deve ser depois do início.");
-      return;
+    if (endDate || endTime) {
+      const resolvedEndDate = endDate || startDate;
+      const resolvedEndTime = endTime || startTime;
+      endDateTime = `${resolvedEndDate}T${resolvedEndTime}:00`;
+      if (new Date(endDateTime) <= new Date(startDateTime)) {
+        toast.error("A data/hora de término deve ser depois do início.");
+        return;
+      }
     }
 
+    const isCamp = tipoEvento === "ACAMPAMENTO";
     await addEvent({
       title,
       date: startDateTime,
-      endDate: endDateTime,
+      endDate: endDateTime ?? undefined,
       description,
       allMinistries,
       ministryIds: allMinistries ? [] : selectedMinistries,
-      allowInscriptions,
-      maxInscriptions: allowInscriptions && maxInscriptions ? parseInt(maxInscriptions) : undefined,
-      igrejaId: activeIgreja?.id,
+      allowInscriptions: isCamp ? true : allowInscriptions,
+      maxInscriptions: !isCamp && allowInscriptions && maxInscriptions ? parseInt(maxInscriptions) : undefined,
+      igrejaId: isCamp ? undefined : activeIgreja?.id,
+      tipoEvento,
+      vagasMasculino: isCamp && vagasMasculino ? parseInt(vagasMasculino) : undefined,
+      vagasFeminino: isCamp && vagasFeminino ? parseInt(vagasFeminino) : undefined,
+      quantidadeQuartos: isCamp && quantidadeQuartos ? parseInt(quantidadeQuartos) : undefined,
     });
 
     toast.success("Evento criado!");
@@ -136,24 +155,25 @@ export function Calendar() {
     setSelectedEvent(null);
   };
 
-  const handleInscrever = async () => {
+  const handleInscrever = async (tipoParticipante?: string, sexo?: string) => {
     if (!selectedEvent) return;
     setInscricaoLoading(true);
+    setShowCampModal(false);
     try {
-      await inscreverEvento(selectedEvent.resource.id);
-      // Atualiza o selectedEvent com dados atualizados
-      const updatedEvent = events.find(e => e.id === selectedEvent.resource.id);
-      if (updatedEvent) {
-        setSelectedEvent((prev: any) => ({
-          ...prev,
-          resource: { ...prev.resource, ...updatedEvent },
-        }));
-      }
+      await inscreverEvento(selectedEvent.resource.id, tipoParticipante, sexo);
       toast.success("Inscrição confirmada!");
     } catch (err: any) {
       toast.error(err.message || "Erro ao se inscrever.");
     } finally {
       setInscricaoLoading(false);
+    }
+  };
+
+  const handleInscreverClick = () => {
+    if (liveSelected?.resource.tipoEvento === "ACAMPAMENTO") {
+      setShowCampModal(true);
+    } else {
+      handleInscrever();
     }
   };
 
@@ -245,12 +265,24 @@ export function Calendar() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <h2 className="text-xl font-semibold">Cadastrar Novo Evento</h2>
 
+            {/* Tipo de Evento */}
+            <div className="flex gap-2 p-1 bg-muted rounded-lg w-fit">
+              <button type="button" onClick={() => setTipoEvento("NORMAL")}
+                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${tipoEvento === "NORMAL" ? "bg-background shadow text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+                <CalendarIcon className="w-4 h-4" /> Evento Normal
+              </button>
+              <button type="button" onClick={() => setTipoEvento("ACAMPAMENTO")}
+                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${tipoEvento === "ACAMPAMENTO" ? "bg-background shadow text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+                <Tent className="w-4 h-4" /> Acampamento
+              </button>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1 md:col-span-2">
                 <label className="text-sm font-medium">Título *</label>
                 <input required type="text" maxLength={30} value={title} onChange={e => setTitle(e.target.value)}
                   className="w-full px-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="Ex: Culto de Jovens" />
+                  placeholder={tipoEvento === "ACAMPAMENTO" ? "Ex: Acampamento de Jovens 2025" : "Ex: Culto de Jovens"} />
                 <p className="text-xs text-muted-foreground text-right">{title.length}/30</p>
               </div>
 
@@ -269,13 +301,13 @@ export function Calendar() {
 
               {/* Término */}
               <div className="space-y-1">
-                <label className="text-sm font-medium">Data de término *</label>
-                <input required type="date" value={endDate} min={startDate} onChange={e => setEndDate(e.target.value)}
+                <label className="text-sm font-medium">Data de término <span className="text-muted-foreground font-normal text-xs">(opcional)</span></label>
+                <input type="date" value={endDate} min={startDate} onChange={e => setEndDate(e.target.value)}
                   className="w-full px-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary" />
               </div>
               <div className="space-y-1">
-                <label className="text-sm font-medium">Horário de término *</label>
-                <input required type="time" value={endTime} onChange={e => setEndTime(e.target.value)}
+                <label className="text-sm font-medium">Horário de término <span className="text-muted-foreground font-normal text-xs">(opcional)</span></label>
+                <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)}
                   className="w-full px-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary" />
               </div>
             </div>
@@ -308,7 +340,38 @@ export function Calendar() {
               )}
             </div>
 
-            {/* Inscrições */}
+            {/* Camp capacity fields */}
+            {tipoEvento === "ACAMPAMENTO" && (
+              <div className="space-y-3 pt-1 border-t">
+                <div className="flex items-center gap-2 text-sm font-medium text-primary">
+                  <Tent className="w-4 h-4" /> Vagas do Acampamento
+                </div>
+                <p className="text-xs text-muted-foreground -mt-2">Inscrições são abertas automaticamente. O acampamento é visível para todas as igrejas.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium">Vagas Masculinas</label>
+                    <input type="number" min="1" value={vagasMasculino} onChange={e => setVagasMasculino(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                      placeholder="Sem limite" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium">Vagas Femininas</label>
+                    <input type="number" min="1" value={vagasFeminino} onChange={e => setVagasFeminino(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                      placeholder="Sem limite" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium">Quartos de Casal</label>
+                    <input type="number" min="1" value={quantidadeQuartos} onChange={e => setQuantidadeQuartos(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                      placeholder="Sem limite" />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Inscrições (only for normal events) */}
+            {tipoEvento === "NORMAL" && (
             <div className="space-y-3 pt-1 border-t">
               <label className="flex w-fit items-center gap-3 p-3 border rounded-md cursor-pointer bg-background hover:bg-accent transition-colors">
                 <input type="checkbox" checked={allowInscriptions} className="sr-only"
@@ -327,6 +390,7 @@ export function Calendar() {
                 </div>
               )}
             </div>
+            )}
 
             <div className="space-y-1 pt-1">
               <label className="text-sm font-medium">Descrição</label>
@@ -368,7 +432,14 @@ export function Calendar() {
               )}
             </div>
             <div className="space-y-2 flex-1 min-w-0">
-              <h3 className="text-2xl font-semibold">{liveSelected.title}</h3>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-2xl font-semibold">{liveSelected.title}</h3>
+                {liveSelected.resource.tipoEvento === "ACAMPAMENTO" && (
+                  <span className="flex items-center gap-1 px-2 py-0.5 bg-primary/10 text-primary text-xs font-medium rounded-full border border-primary/20">
+                    <Tent className="w-3 h-3" /> Acampamento
+                  </span>
+                )}
+              </div>
               <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
                 <div className="flex items-center gap-1">
                   <Clock className="w-4 h-4" />
@@ -396,28 +467,57 @@ export function Calendar() {
               {/* Inscrições */}
               {liveSelected.resource.allowInscriptions && (
                 <div className="pt-2 space-y-3">
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                      <Users className="w-4 h-4" />
-                      <span>
-                        {liveSelected.resource.inscricoesCount ?? 0} inscritos
-                        {liveSelected.resource.maxInscriptions
-                          ? ` / ${liveSelected.resource.maxInscriptions} vagas`
-                          : ''}
-                      </span>
+                  {/* Camp capacity bars */}
+                  {liveSelected.resource.tipoEvento === "ACAMPAMENTO" && (
+                    <div className="grid grid-cols-3 gap-3">
+                      {[
+                        { label: "Masculino", used: liveSelected.resource.inscricosMasculino ?? 0, total: liveSelected.resource.vagasMasculino },
+                        { label: "Feminino", used: liveSelected.resource.inscricosFeminino ?? 0, total: liveSelected.resource.vagasFeminino },
+                        { label: "Quartos Casal", used: liveSelected.resource.inscricosCasais ?? 0, total: liveSelected.resource.quantidadeQuartos },
+                      ].map(({ label, used, total }) => (
+                        <div key={label} className="text-center p-2 bg-muted/50 rounded-md">
+                          <p className="text-xs text-muted-foreground mb-1">{label}</p>
+                          <p className="text-lg font-bold text-primary">{used}</p>
+                          <p className="text-xs text-muted-foreground">/ {total ?? "∞"} vagas</p>
+                        </div>
+                      ))}
                     </div>
+                  )}
+
+                  <div className="flex items-center gap-3 flex-wrap">
+                    {liveSelected.resource.tipoEvento !== "ACAMPAMENTO" && (
+                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                        <Users className="w-4 h-4" />
+                        <span>
+                          {liveSelected.resource.inscricoesCount ?? 0} inscritos
+                          {liveSelected.resource.maxInscriptions
+                            ? ` / ${liveSelected.resource.maxInscriptions} vagas`
+                            : ''}
+                        </span>
+                      </div>
+                    )}
 
                     {/* Botão de inscrição para membros */}
                     {user && (
                       liveSelected.resource.userInscrito ? (
-                        <button onClick={handleDesinscrever} disabled={inscricaoLoading}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md border border-destructive/40 text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50">
-                          <UserX className="w-4 h-4" />
-                          {inscricaoLoading ? 'Cancelando...' : 'Cancelar inscrição'}
-                        </button>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {liveSelected.resource.tipoEvento === "ACAMPAMENTO" && liveSelected.resource.userTipoParticipante && (
+                            <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full">
+                              {liveSelected.resource.userTipoParticipante === "APOIO_CASAL" ? "Apoio Casal" :
+                               liveSelected.resource.userTipoParticipante === "APOIO" ? `Apoio (${liveSelected.resource.userSexo === "MASCULINO" ? "M" : "F"})` :
+                               `Jovem (${liveSelected.resource.userSexo === "MASCULINO" ? "M" : "F"})`}
+                            </span>
+                          )}
+                          <button onClick={handleDesinscrever} disabled={inscricaoLoading}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md border border-destructive/40 text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50">
+                            <UserX className="w-4 h-4" />
+                            {inscricaoLoading ? 'Cancelando...' : 'Cancelar inscrição'}
+                          </button>
+                        </div>
                       ) : (
-                        <button onClick={handleInscrever} disabled={inscricaoLoading ||
-                          (liveSelected.resource.maxInscriptions != null &&
+                        <button onClick={handleInscreverClick} disabled={inscricaoLoading ||
+                          (liveSelected.resource.tipoEvento !== "ACAMPAMENTO" &&
+                           liveSelected.resource.maxInscriptions != null &&
                            (liveSelected.resource.inscricoesCount ?? 0) >= liveSelected.resource.maxInscriptions)}
                           className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50">
                           <UserCheck className="w-4 h-4" />
@@ -446,10 +546,17 @@ export function Calendar() {
                           <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-bold shrink-0">
                             {i.nome.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()}
                           </div>
-                          <div>
+                          <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium">{i.nome}</p>
                             <p className="text-xs text-muted-foreground">{i.email}</p>
                           </div>
+                          {i.tipoParticipante && (
+                            <span className="text-xs px-2 py-0.5 bg-muted rounded-full shrink-0">
+                              {i.tipoParticipante === "APOIO_CASAL" ? "Casal" :
+                               i.tipoParticipante === "APOIO" ? `Apoio ${i.sexo === "MASCULINO" ? "♂" : "♀"}` :
+                               `Jovem ${i.sexo === "MASCULINO" ? "♂" : "♀"}`}
+                            </span>
+                          )}
                         </div>
                       ))}
                     </div>
