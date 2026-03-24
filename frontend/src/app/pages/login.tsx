@@ -5,13 +5,14 @@ import { Card } from "../components/ui/card";
 import { Church, Lock, Mail, User, Building, Search, CheckCircle2, ArrowRight, Plus, Eye, EyeOff, Phone } from "lucide-react";
 import logoImg from "../../assets/53ef4314c936ceb2d472946a347e2bbb419189ab.png";
 import { toast } from "sonner";
+import { GoogleLogin } from "@react-oauth/google";
 
 const BASE_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:8080") + "/api";
 
 type IgrejaOption = { id: string; nome: string; cidade?: string; isPending?: boolean };
 
 export function Login() {
-  const { login, register, verifyEmail, resendCode, finalizeAuth, isAuthenticated } = useAuth();
+  const { login, loginWithGoogle, register, verifyEmail, resendCode, finalizeAuth, isAuthenticated } = useAuth();
 
   const [isRegistering, setIsRegistering] = useState(false);
   const [isSelectingIgreja, setIsSelectingIgreja] = useState(false);
@@ -103,10 +104,12 @@ export function Login() {
 
     if (!result.success) {
       if (result.needsVerification) {
+        const verifEmail = result.email ?? email;
         setPendingChurchData(null);
-        setVerificationEmail(result.email ?? email);
+        setVerificationEmail(verifEmail);
         setVerificationCode("");
         setIsVerifying(true);
+        resendCode(verifEmail);
       } else {
         toast.error(result.error || "Erro ao fazer login");
       }
@@ -248,7 +251,8 @@ export function Login() {
             <h1 className="text-2xl font-bold">Verifique seu email</h1>
             <p className="text-muted-foreground mt-2 text-sm">
               Enviamos um código de 6 dígitos para<br />
-              <strong className="text-foreground">{verificationEmail}</strong>
+              <strong className="text-foreground">{verificationEmail}</strong><br />
+              Verifique sua caixa de entrada (e o spam).
             </p>
           </div>
 
@@ -368,6 +372,28 @@ export function Login() {
               >
                 {isSubmitting ? "Entrando..." : "Entrar"}
               </button>
+
+              <div className="relative flex items-center gap-3 py-1">
+                <div className="flex-1 h-px bg-border" />
+                <span className="text-xs text-muted-foreground">ou</span>
+                <div className="flex-1 h-px bg-border" />
+              </div>
+
+              <div className="flex justify-center">
+                <GoogleLogin
+                  onSuccess={async (credentialResponse) => {
+                    if (!credentialResponse.credential) return;
+                    setIsSubmitting(true);
+                    const result = await loginWithGoogle(credentialResponse.credential);
+                    setIsSubmitting(false);
+                    if (!result.success) toast.error(result.error || "Erro ao entrar com Google.");
+                  }}
+                  onError={() => toast.error("Falha ao autenticar com Google.")}
+                  width="100%"
+                  text="continue_with"
+                  locale="pt-BR"
+                />
+              </div>
             </form>
           )}
 
