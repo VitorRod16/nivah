@@ -46,4 +46,13 @@ public class User {
 
     @JsonIgnore
     private LocalDateTime resetTokenExpiry;
+
+    @Builder.Default
+    private boolean emailVerified = false;
+
+    @JsonIgnore
+    private String verificationCode;
+
+    @JsonIgnore
+    private LocalDateTime verificationCodeExpiry;
 }

@@ -63,24 +63,16 @@ public class AuthService {
                 .role(role)
                 .build();
 
+        String code = String.format("%06d", (int)(Math.random() * 1_000_000));
+        user.setVerificationCode(code);
+        user.setVerificationCodeExpiry(LocalDateTime.now().plusMinutes(15));
         user = userRepository.save(user);
 
-        UserDetails userDetails = org.springframework.security.core.userdetails.User
-                .withUsername(user.getEmail())
-                .password(user.getPassword())
-                .authorities("ROLE_" + user.getRole().name())
-                .build();
-
-        String token = jwtTokenProvider.generateToken(userDetails, user.getRole());
+        sendVerificationEmail(user.getEmail(), user.getName(), code);
 
         return AuthResponse.builder()
-                .token(token)
-                .id(user.getId())
-                .name(user.getName())
                 .email(user.getEmail())
-                .role(user.getRole().name())
-                .photoUrl(user.getPhotoUrl())
-                .status(user.getStatus())
+                .needsVerification(true)
                 .build();
     }
 
@@ -93,6 +85,10 @@ public class AuthService {
 
         User user = userRepository.findByEmail(userDetails.getUsername())
                 .orElseThrow(() -> new IllegalStateException("User not found after authentication"));
+
+        if (!user.isEmailVerified()) {
+            throw new IllegalStateException("EMAIL_NOT_VERIFIED:" + user.getEmail());
+        }
 
         String token = jwtTokenProvider.generateToken(userDetails, user.getRole());
 
@@ -161,6 +157,114 @@ public class AuthService {
                 .photoUrl(user.getPhotoUrl())
                 .status(user.getStatus())
                 .build();
+    }
+
+    public AuthResponse verifyEmail(String email, String code) {
+        String normalizedEmail = email.trim().toLowerCase();
+        User user = userRepository.findByEmail(normalizedEmail)
+                .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado."));
+
+        if (user.isEmailVerified()) {
+            throw new IllegalArgumentException("Email já verificado.");
+        }
+        if (user.getVerificationCode() == null || !user.getVerificationCode().equals(code)) {
+            throw new IllegalArgumentException("Código inválido.");
+        }
+        if (user.getVerificationCodeExpiry() == null || user.getVerificationCodeExpiry().isBefore(LocalDateTime.now())) {
+            throw new IllegalArgumentException("Código expirado. Solicite um novo.");
+        }
+
+        user.setEmailVerified(true);
+        user.setVerificationCode(null);
+        user.setVerificationCodeExpiry(null);
+        user = userRepository.save(user);
+
+        UserDetails userDetails = org.springframework.security.core.userdetails.User
+                .withUsername(user.getEmail())
+                .password(user.getPassword())
+                .authorities("ROLE_" + user.getRole().name())
+                .build();
+
+        String token = jwtTokenProvider.generateToken(userDetails, user.getRole());
+
+        return AuthResponse.builder()
+                .token(token)
+                .id(user.getId())
+                .name(user.getName())
+                .email(user.getEmail())
+                .role(user.getRole().name())
+                .photoUrl(user.getPhotoUrl())
+                .status(user.getStatus())
+                .build();
+    }
+
+    public void resendVerificationCode(String email) {
+        String normalizedEmail = email.trim().toLowerCase();
+        User user = userRepository.findByEmail(normalizedEmail)
+                .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado."));
+
+        if (user.isEmailVerified()) {
+            throw new IllegalArgumentException("Email já verificado.");
+        }
+
+        String code = String.format("%06d", (int)(Math.random() * 1_000_000));
+        user.setVerificationCode(code);
+        user.setVerificationCodeExpiry(LocalDateTime.now().plusMinutes(15));
+        userRepository.save(user);
+
+        sendVerificationEmail(user.getEmail(), user.getName(), code);
+    }
+
+    private void sendVerificationEmail(String email, String name, String code) {
+        try {
+            MimeMessage mail = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(mail, true, "UTF-8");
+            helper.setFrom(fromEmail);
+            helper.setTo(email);
+            helper.setSubject("Verificação de email — Nivah");
+            helper.setText(buildVerificationEmailHtml(name, code), true);
+            mailSender.send(mail);
+        } catch (Exception e) {
+            log.error("Falha ao enviar email de verificação para {}: {}", email, e.getMessage());
+        }
+    }
+
+    private String buildVerificationEmailHtml(String name, String code) {
+        return """
+                <!DOCTYPE html>
+                <html lang="pt-BR">
+                <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+                <body style="margin:0;padding:0;background:#f3f4f6;font-family:'Segoe UI',Arial,sans-serif;">
+                  <table width="100%%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:40px 16px;">
+                    <tr><td align="center">
+                      <table width="100%%" cellpadding="0" cellspacing="0" style="max-width:560px;">
+                        <tr>
+                          <td style="background:linear-gradient(135deg,#3b5bdb 0%%,#4f6ef7 100%%);border-radius:12px 12px 0 0;padding:32px 40px;text-align:center;">
+                            <p style="margin:0;color:#fff;font-size:22px;font-weight:700;letter-spacing:1px;">Nivah</p>
+                            <p style="margin:6px 0 0;color:rgba(255,255,255,0.8);font-size:13px;">Sistema de Gestão</p>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td style="background:#fff;padding:36px 40px;text-align:center;">
+                            <p style="margin:0 0 8px;color:#6b7280;font-size:14px;text-align:left;">Olá, <strong style="color:#111827;">%s</strong>!</p>
+                            <p style="margin:0 0 28px;color:#374151;font-size:15px;text-align:left;">Use o código abaixo para verificar seu email e concluir o cadastro:</p>
+                            <div style="background:#f0f4ff;border-radius:12px;padding:24px 32px;margin:0 auto 24px;display:inline-block;">
+                              <p style="margin:0;font-size:40px;font-weight:800;letter-spacing:12px;color:#3b5bdb;font-family:monospace;">%s</p>
+                            </div>
+                            <p style="margin:0;color:#9ca3af;font-size:13px;text-align:left;">Este código expira em <strong>15 minutos</strong>. Se você não criou uma conta no Nivah, ignore este email.</p>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td style="background:#f9fafb;border-top:1px solid #e5e7eb;border-radius:0 0 12px 12px;padding:20px 40px;text-align:center;">
+                            <p style="margin:0;color:#9ca3af;font-size:12px;">Enviado pelo <strong style="color:#6b7280;">Sistema Nivah</strong>. Por favor, não responda este email.</p>
+                          </td>
+                        </tr>
+                      </table>
+                    </td></tr>
+                  </table>
+                </body>
+                </html>
+                """.formatted(name, code);
     }
 
     public void forgotPassword(String email) {

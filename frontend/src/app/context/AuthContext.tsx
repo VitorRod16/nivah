@@ -14,8 +14,10 @@ export type User = {
 type AuthContextType = {
   user: User | null;
   isAuthenticated: boolean;
-  login: (email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
-  register: (name: string, email: string, password?: string, role?: UserRole) => Promise<{ success: boolean; error?: string; token?: string; userData?: User }>;
+  login: (email: string, password?: string) => Promise<{ success: boolean; error?: string; needsVerification?: boolean; email?: string }>;
+  register: (name: string, email: string, password?: string, role?: UserRole) => Promise<{ success: boolean; error?: string; needsVerification?: boolean; email?: string }>;
+  verifyEmail: (email: string, code: string) => Promise<{ success: boolean; error?: string }>;
+  resendCode: (email: string) => Promise<{ success: boolean; error?: string }>;
   finalizeAuth: (user: User, token: string) => void;
   updateUser: (data: { name: string; email: string; status?: string }) => Promise<{ success: boolean; error?: string }>;
   updatePhoto: (photoUrl: string) => Promise<{ success: boolean; error?: string }>;
@@ -69,6 +71,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({ email, password }),
       });
       const data = await safeJson(res);
+      if (res.status === 403 && data.needsVerification) {
+        return { success: false, needsVerification: true, email: data.email, error: "Email não verificado." };
+      }
       if (!res.ok) return { success: false, error: data.message || "E-mail ou senha incorretos." };
       localStorage.setItem("token", data.token);
       setUser({ id: data.id, name: data.name, email: data.email, role: data.role ?? "MEMBRO", photoUrl: data.photoUrl, status: data.status });
@@ -92,8 +97,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (errorMsg.includes("already")) errorMsg = "Este e-mail já está em uso.";
         return { success: false, error: errorMsg };
       }
+      if (data.needsVerification) {
+        return { success: true, needsVerification: true, email: data.email };
+      }
       const userData: User = { id: data.id, name: data.name, email: data.email, role: data.role ?? "MEMBRO" };
-      return { success: true, token: data.token, userData };
+      return { success: true, email: data.email, userData };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  const verifyEmail = async (email: string, code: string) => {
+    try {
+      const res = await fetch(`${BASE_URL}/auth/verify-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, code }),
+      });
+      const data = await safeJson(res);
+      if (!res.ok) return { success: false, error: data.error || "Código inválido." };
+      localStorage.setItem("token", data.token);
+      setUser({ id: data.id, name: data.name, email: data.email, role: data.role ?? "MEMBRO", photoUrl: data.photoUrl, status: data.status });
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  const resendCode = async (email: string) => {
+    try {
+      const res = await fetch(`${BASE_URL}/auth/resend-code`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await safeJson(res);
+      if (!res.ok) return { success: false, error: data.error || "Erro ao reenviar código." };
+      return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message };
     }
@@ -144,7 +184,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, register, finalizeAuth, updateUser, updatePhoto, logout, isLoadingAuth }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, register, verifyEmail, resendCode, finalizeAuth, updateUser, updatePhoto, logout, isLoadingAuth }}>
       {children}
     </AuthContext.Provider>
   );

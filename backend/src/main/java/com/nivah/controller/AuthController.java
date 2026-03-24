@@ -33,9 +33,22 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest request) {
-        AuthResponse response = authService.login(request);
-        return ResponseEntity.ok(response);
+    public ResponseEntity<?> login(@RequestBody LoginRequest request) {
+        try {
+            AuthResponse response = authService.login(request);
+            return ResponseEntity.ok(response);
+        } catch (IllegalStateException e) {
+            String msg = e.getMessage();
+            if (msg != null && msg.startsWith("EMAIL_NOT_VERIFIED:")) {
+                String email = msg.substring("EMAIL_NOT_VERIFIED:".length());
+                return ResponseEntity.status(403).body(Map.of(
+                        "message", "Email não verificado.",
+                        "needsVerification", true,
+                        "email", email
+                ));
+            }
+            return ResponseEntity.status(401).body(Map.of("message", "E-mail ou senha incorretos."));
+        }
     }
 
     @GetMapping("/me")
@@ -68,6 +81,26 @@ public class AuthController {
             AuthResponse response = authService.updatePhoto(userDetails.getUsername(), photoUrl);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/verify-email")
+    public ResponseEntity<?> verifyEmail(@RequestBody Map<String, String> body) {
+        try {
+            AuthResponse response = authService.verifyEmail(body.get("email"), body.get("code"));
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/resend-code")
+    public ResponseEntity<?> resendCode(@RequestBody Map<String, String> body) {
+        try {
+            authService.resendVerificationCode(body.getOrDefault("email", ""));
+            return ResponseEntity.ok(Map.of("message", "Código reenviado."));
+        } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }

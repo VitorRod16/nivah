@@ -11,7 +11,7 @@ const BASE_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:8080") + "/a
 type IgrejaOption = { id: string; nome: string; cidade?: string; isPending?: boolean };
 
 export function Login() {
-  const { login, register, finalizeAuth, isAuthenticated } = useAuth();
+  const { login, register, verifyEmail, resendCode, finalizeAuth, isAuthenticated } = useAuth();
 
   const [isRegistering, setIsRegistering] = useState(false);
   const [isSelectingIgreja, setIsSelectingIgreja] = useState(false);
@@ -29,6 +29,17 @@ export function Login() {
   // Password visibility
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Email verification
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verificationEmail, setVerificationEmail] = useState("");
+  const [verificationCode, setVerificationCode] = useState("");
+  const [pendingChurchData, setPendingChurchData] = useState<{
+    selectedIgrejaId: string;
+    isNewIgreja: boolean;
+    pendingNewIgreja: { nome: string; cidade: string } | null;
+    phone: string;
+  } | null>(null);
 
   // Forgot password
   const [isForgotPassword, setIsForgotPassword] = useState(false);
@@ -91,7 +102,14 @@ export function Login() {
     setIsSubmitting(false);
 
     if (!result.success) {
-      toast.error(result.error || "Erro ao fazer login");
+      if (result.needsVerification) {
+        setPendingChurchData(null);
+        setVerificationEmail(result.email ?? email);
+        setVerificationCode("");
+        setIsVerifying(true);
+      } else {
+        toast.error(result.error || "Erro ao fazer login");
+      }
     }
   };
 
@@ -121,7 +139,6 @@ export function Login() {
     const isNewIgreja = selectedIgrejaId === "pending-new";
     const toastId = toast.loading("Criando conta...");
 
-    // Se está criando uma nova igreja, registra como PASTOR; caso contrário, como MEMBRO
     const role = isNewIgreja ? "PASTOR" : "MEMBRO";
     const result = await register(name, email, password, role);
     if (!result.success) {
@@ -130,42 +147,72 @@ export function Login() {
       return;
     }
 
-    const { token, userData } = result;
-    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
-
-    let igrejaId = selectedIgrejaId;
-
-    // Se é uma nova igreja, cria ela agora (o serviço já vincula o PASTOR automaticamente)
-    if (isNewIgreja && pendingNewIgreja) {
-      try {
-        const res = await fetch(`${BASE_URL}/igrejas`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify({ nome: pendingNewIgreja.nome, cidade: pendingNewIgreja.cidade }),
-        });
-        const created = await res.json();
-        igrejaId = created.id;
-      } catch {
-        igrejaId = "";
-      }
-    }
-
-    // Vincula o usuário à igreja como membro
-    if (igrejaId && igrejaId !== "pending-new") {
-      try {
-        await fetch(`${BASE_URL}/membros`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify({ email, igrejaId, phone: phone || undefined }),
-        });
-      } catch {
-        // Non-critical — user account was created successfully
-      }
-    }
-
-    toast.success("Conta criada com sucesso! Bem-vindo ao Nivah.", { id: toastId });
+    toast.dismiss(toastId);
     setIsSubmitting(false);
-    finalizeAuth(userData!, token!);
+
+    // Salva dados pendentes para usar após verificação
+    setPendingChurchData({ selectedIgrejaId, isNewIgreja, pendingNewIgreja, phone });
+    setVerificationEmail(result.email ?? email);
+    setVerificationCode("");
+    setIsVerifying(true);
+  };
+
+  const handleVerifyEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!verificationCode || verificationCode.length !== 6) {
+      toast.error("Digite o código de 6 dígitos.");
+      return;
+    }
+    setIsSubmitting(true);
+    const result = await verifyEmail(verificationEmail, verificationCode);
+    if (!result.success) {
+      toast.error(result.error || "Código inválido.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    // Verificação concluída — token já salvo pelo context. Agora configura a igreja.
+    const token = localStorage.getItem("token")!;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    const church = pendingChurchData;
+
+    if (church) {
+      let igrejaId = church.selectedIgrejaId;
+      if (church.isNewIgreja && church.pendingNewIgreja) {
+        try {
+          const res = await fetch(`${BASE_URL}/igrejas`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ nome: church.pendingNewIgreja.nome, cidade: church.pendingNewIgreja.cidade }),
+          });
+          const created = await res.json();
+          igrejaId = created.id;
+        } catch {
+          igrejaId = "";
+        }
+      }
+      if (igrejaId && igrejaId !== "pending-new") {
+        try {
+          await fetch(`${BASE_URL}/membros`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ email: verificationEmail, igrejaId, phone: church.phone || undefined }),
+          });
+        } catch {
+          // Non-critical
+        }
+      }
+    }
+
+    toast.success("Conta criada com sucesso! Bem-vindo ao Nivah.");
+    setIsSubmitting(false);
+    // context já autenticou o usuário após verifyEmail
+  };
+
+  const handleResendCode = async () => {
+    const result = await resendCode(verificationEmail);
+    if (result.success) toast.success("Código reenviado para " + verificationEmail);
+    else toast.error(result.error || "Erro ao reenviar código.");
   };
 
   const handleAddNewIgreja = (e: React.FormEvent) => {
@@ -189,6 +236,59 @@ export function Login() {
     i.nome.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (i.cidade ?? "").toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  if (isVerifying) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col justify-center items-center p-4">
+        <div className="w-full max-w-sm space-y-6">
+          <div className="text-center">
+            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+              <Mail className="w-8 h-8 text-primary" />
+            </div>
+            <h1 className="text-2xl font-bold">Verifique seu email</h1>
+            <p className="text-muted-foreground mt-2 text-sm">
+              Enviamos um código de 6 dígitos para<br />
+              <strong className="text-foreground">{verificationEmail}</strong>
+            </p>
+          </div>
+
+          <form onSubmit={handleVerifyEmail} className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Código de verificação</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                value={verificationCode}
+                onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                className="w-full py-3 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary text-center text-2xl font-bold tracking-[0.5em] font-mono"
+                placeholder="000000"
+                autoFocus
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={isSubmitting || verificationCode.length !== 6}
+              className="w-full py-2.5 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors font-medium"
+            >
+              {isSubmitting ? "Verificando..." : "Confirmar"}
+            </button>
+          </form>
+
+          <div className="text-center space-y-2">
+            <p className="text-sm text-muted-foreground">Não recebeu o código?</p>
+            <button
+              onClick={handleResendCode}
+              className="text-sm text-primary hover:underline font-medium"
+            >
+              Reenviar código
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col justify-center items-center p-4">

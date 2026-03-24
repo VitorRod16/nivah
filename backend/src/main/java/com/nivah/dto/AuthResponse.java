@@ -19,4 +19,5 @@ public class AuthResponse {
     private String role;
     private String photoUrl;
     private String status;
+    private boolean needsVerification;
 }
