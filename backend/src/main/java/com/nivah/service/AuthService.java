@@ -361,6 +361,16 @@ public class AuthService {
         // Sempre retorna sem erro para não revelar se o email existe
     }
 
+    public void changePassword(String email, String currentPassword, String newPassword) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado."));
+        if (user.getPassword() == null || !passwordEncoder.matches(currentPassword, user.getPassword())) {
+            throw new IllegalArgumentException("Senha atual incorreta.");
+        }
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+    }
+
     public void resetPassword(String token, String newPassword) {
         User user = userRepository.findByResetToken(token)
                 .orElseThrow(() -> new IllegalArgumentException("Token inválido ou expirado."));

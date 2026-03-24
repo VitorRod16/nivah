@@ -117,6 +117,16 @@ public class AuthController {
         }
     }
 
+    @PutMapping("/me/password")
+    public ResponseEntity<?> changePassword(@RequestBody Map<String, String> body, @AuthenticationPrincipal UserDetails userDetails) {
+        try {
+            authService.changePassword(userDetails.getUsername(), body.get("currentPassword"), body.get("newPassword"));
+            return ResponseEntity.ok(Map.of("message", "Senha alterada com sucesso."));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
     @PostMapping("/forgot-password")
     public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> body) {
         authService.forgotPassword(body.getOrDefault("email", ""));

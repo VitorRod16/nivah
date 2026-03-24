@@ -22,6 +22,7 @@ type AuthContextType = {
   finalizeAuth: (user: User, token: string) => void;
   updateUser: (data: { name: string; email: string; status?: string }) => Promise<{ success: boolean; error?: string }>;
   updatePhoto: (photoUrl: string) => Promise<{ success: boolean; error?: string }>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   isLoadingAuth: boolean;
 };
@@ -196,13 +197,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const changePassword = async (currentPassword: string, newPassword: string) => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${BASE_URL}/auth/me/password`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const data = await safeJson(res);
+      if (!res.ok) return { success: false, error: data.error || "Erro ao alterar senha." };
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  };
+
   const logout = async () => {
     localStorage.removeItem("token");
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, loginWithGoogle, register, verifyEmail, resendCode, finalizeAuth, updateUser, updatePhoto, logout, isLoadingAuth }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, loginWithGoogle, register, verifyEmail, resendCode, finalizeAuth, updateUser, updatePhoto, changePassword, logout, isLoadingAuth }}>
       {children}
     </AuthContext.Provider>
   );

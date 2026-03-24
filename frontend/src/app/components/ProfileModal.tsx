@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Pencil, Check, X, Camera, MessageCircle } from 'lucide-react';
+import { Pencil, Check, X, Camera, MessageCircle, KeyRound, Eye, EyeOff } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -7,6 +7,7 @@ import {
   DialogTitle,
 } from './ui/dialog';
 import { useAuth } from '../context/AuthContext';
+import { toast } from 'sonner';
 
 interface ProfileModalProps {
   open: boolean;
@@ -15,7 +16,7 @@ interface ProfileModalProps {
 }
 
 export function ProfileModal({ open, onClose, roleLabel }: ProfileModalProps) {
-  const { user, updateUser, updatePhoto } = useAuth();
+  const { user, updateUser, updatePhoto, changePassword } = useAuth();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(user?.name ?? '');
   const [email, setEmail] = useState(user?.email ?? '');
@@ -25,6 +26,15 @@ export function ProfileModal({ open, onClose, roleLabel }: ProfileModalProps) {
   const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [savingPassword, setSavingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+
   useEffect(() => {
     if (open) {
       setName(user?.name ?? '');
@@ -32,6 +42,11 @@ export function ProfileModal({ open, onClose, roleLabel }: ProfileModalProps) {
       setStatus(user?.status ?? '');
       setEditing(false);
       setError('');
+      setChangingPassword(false);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setPasswordError('');
     }
   }, [open, user]);
 
@@ -52,6 +67,34 @@ export function ProfileModal({ open, onClose, roleLabel }: ProfileModalProps) {
       setEditing(false);
     } else {
       setError(result.error ?? 'Erro ao salvar.');
+    }
+  };
+
+  const handleSavePassword = async () => {
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setPasswordError('Preencha todos os campos.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError('A nova senha e a confirmação não coincidem.');
+      return;
+    }
+    if (newPassword.length < 6) {
+      setPasswordError('A nova senha deve ter pelo menos 6 caracteres.');
+      return;
+    }
+    setSavingPassword(true);
+    setPasswordError('');
+    const result = await changePassword(currentPassword, newPassword);
+    setSavingPassword(false);
+    if (result.success) {
+      setChangingPassword(false);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      toast.success('Senha alterada com sucesso.');
+    } else {
+      setPasswordError(result.error ?? 'Erro ao alterar senha.');
     }
   };
 
@@ -216,6 +259,74 @@ export function ProfileModal({ open, onClose, roleLabel }: ProfileModalProps) {
                   <Pencil className="w-3.5 h-3.5" /> Editar perfil
                 </button>
               </div>
+
+              {changingPassword ? (
+                <div className="w-full flex flex-col gap-3 pt-3 border-t border-border">
+                  <p className="text-xs text-muted-foreground font-medium">Trocar senha</p>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-muted-foreground">Senha atual</label>
+                    <div className="relative">
+                      <input
+                        type={showCurrent ? 'text' : 'password'}
+                        value={currentPassword}
+                        onChange={e => setCurrentPassword(e.target.value)}
+                        className="w-full pr-9 pl-3 py-2 rounded-md border border-border bg-input text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                      />
+                      <button type="button" onClick={() => setShowCurrent(v => !v)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground">
+                        {showCurrent ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-muted-foreground">Nova senha</label>
+                    <div className="relative">
+                      <input
+                        type={showNew ? 'text' : 'password'}
+                        value={newPassword}
+                        onChange={e => setNewPassword(e.target.value)}
+                        className="w-full pr-9 pl-3 py-2 rounded-md border border-border bg-input text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                      />
+                      <button type="button" onClick={() => setShowNew(v => !v)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground">
+                        {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-muted-foreground">Confirmar nova senha</label>
+                    <input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={e => setConfirmPassword(e.target.value)}
+                      className="w-full px-3 py-2 rounded-md border border-border bg-input text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </div>
+                  {passwordError && <p className="text-xs text-destructive">{passwordError}</p>}
+                  <div className="flex gap-2 justify-end">
+                    <button
+                      onClick={() => { setChangingPassword(false); setPasswordError(''); }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md border border-border text-muted-foreground hover:bg-accent transition-colors"
+                    >
+                      <X className="w-3.5 h-3.5" /> Cancelar
+                    </button>
+                    <button
+                      onClick={handleSavePassword}
+                      disabled={savingPassword}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-60"
+                    >
+                      <Check className="w-3.5 h-3.5" /> {savingPassword ? 'Salvando...' : 'Salvar'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="pt-3 border-t border-border">
+                  <button
+                    onClick={() => setChangingPassword(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md border border-border text-foreground hover:bg-accent transition-colors w-full justify-center"
+                  >
+                    <KeyRound className="w-3.5 h-3.5" /> Trocar senha
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
