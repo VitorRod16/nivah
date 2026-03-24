@@ -14,6 +14,7 @@ import { Search } from "./pages/search";
 import { Dizimos } from "./pages/dizimos";
 import { NotFound } from "./pages/not-found";
 import { Login } from "./pages/login";
+import { ResetPassword } from "./pages/reset-password";
 import { AuthProvider } from "./context/AuthContext";
 import { MockDataProvider } from "./context/MockDataContext";
 import { ChurchProvider } from "./context/ChurchContext";
@@ -53,6 +54,10 @@ export const router = createBrowserRouter([
       {
         path: "login",
         Component: Login,
+      },
+      {
+        path: "reset-password",
+        Component: ResetPassword,
       },
       {
         element: (

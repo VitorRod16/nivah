@@ -30,6 +30,11 @@ export function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  // Forgot password
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotSent, setForgotSent] = useState(false);
+
   // Igreja states
   const [igrejas, setIgrejas] = useState<IgrejaOption[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -54,6 +59,24 @@ export function Login() {
   if (isAuthenticated) {
     return <Navigate to="/" replace />;
   }
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotEmail) return;
+    setIsSubmitting(true);
+    try {
+      await fetch(`${BASE_URL}/auth/forgot-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: forgotEmail.trim().toLowerCase() }),
+      });
+      setForgotSent(true);
+    } catch {
+      toast.error("Erro de conexão. Tente novamente.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -213,7 +236,7 @@ export function Login() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-sm font-medium">Senha</label>
-                  <button type="button" className="text-xs text-primary hover:underline focus:outline-none">
+                  <button type="button" onClick={() => { setIsForgotPassword(true); setForgotEmail(email); setForgotSent(false); }} className="text-xs text-primary hover:underline focus:outline-none">
                     Esqueceu a senha?
                   </button>
                 </div>
@@ -523,6 +546,71 @@ export function Login() {
           )}
         </Card>
       </div>
+
+      {/* Modal: Esqueceu a senha */}
+      {isForgotPassword && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-background rounded-xl shadow-xl w-full max-w-sm p-6 space-y-4">
+            {!forgotSent ? (
+              <>
+                <div>
+                  <h2 className="text-lg font-bold">Esqueceu sua senha?</h2>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Informe seu email e enviaremos um link para redefinir sua senha.
+                  </p>
+                </div>
+                <form onSubmit={handleForgotPassword} className="space-y-4">
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Mail className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <input
+                      type="email"
+                      required
+                      value={forgotEmail}
+                      onChange={(e) => setForgotEmail(e.target.value.toLowerCase())}
+                      className="w-full pl-10 pr-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                      placeholder="seu@email.com"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsForgotPassword(false)}
+                      className="flex-1 py-2 border rounded-md hover:bg-accent transition-colors text-sm"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="flex-1 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors text-sm font-medium"
+                    >
+                      {isSubmitting ? "Enviando..." : "Enviar link"}
+                    </button>
+                  </div>
+                </form>
+              </>
+            ) : (
+              <>
+                <div className="text-center space-y-3">
+                  <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto" />
+                  <h2 className="text-lg font-bold">Email enviado!</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Se existe uma conta com <strong>{forgotEmail}</strong>, você receberá um link em breve.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsForgotPassword(false)}
+                  className="w-full py-2 border rounded-md hover:bg-accent transition-colors text-sm"
+                >
+                  Fechar
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

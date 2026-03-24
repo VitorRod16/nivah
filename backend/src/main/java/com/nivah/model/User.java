@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
@@ -38,4 +39,11 @@ public class User {
 
     @Column(length = 120)
     private String status;
+
+    @JsonIgnore
+    @Column(unique = true)
+    private String resetToken;
+
+    @JsonIgnore
+    private LocalDateTime resetTokenExpiry;
 }
