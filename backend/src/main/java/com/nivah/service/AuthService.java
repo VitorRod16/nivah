@@ -1,5 +1,9 @@
 package com.nivah.service;
 
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.gson.GsonFactory;
 import com.nivah.dto.AuthResponse;
 import com.nivah.dto.LoginRequest;
 import com.nivah.dto.SignupRequest;
@@ -22,6 +26,7 @@ import org.springframework.util.StringUtils;
 
 import jakarta.mail.internet.MimeMessage;
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.UUID;
 
 @Service
@@ -40,6 +45,9 @@ public class AuthService {
 
     @Value("${app.frontend.url:https://nivah.vercel.app}")
     private String frontendUrl;
+
+    @Value("${google.client-id:}")
+    private String googleClientId;
 
     public AuthResponse signup(SignupRequest request) {
         String email = request.getEmail().trim().toLowerCase();
@@ -265,6 +273,67 @@ public class AuthService {
                 </body>
                 </html>
                 """.formatted(name, code);
+    }
+
+    public AuthResponse googleLogin(String idTokenString) {
+        if (!StringUtils.hasText(googleClientId)) {
+            throw new IllegalStateException("Google Client ID não configurado.");
+        }
+
+        GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
+                new NetHttpTransport(), GsonFactory.getDefaultInstance())
+                .setAudience(Collections.singletonList(googleClientId))
+                .build();
+
+        GoogleIdToken idToken;
+        try {
+            idToken = verifier.verify(idTokenString);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Falha ao verificar token do Google.");
+        }
+
+        if (idToken == null) {
+            throw new IllegalArgumentException("Token do Google inválido.");
+        }
+
+        GoogleIdToken.Payload payload = idToken.getPayload();
+        String email = payload.getEmail().trim().toLowerCase();
+        String name = (String) payload.get("name");
+        String pictureUrl = (String) payload.get("picture");
+
+        User user = userRepository.findByEmail(email).orElseGet(() -> {
+            User newUser = User.builder()
+                    .name(name != null ? name : email)
+                    .email(email)
+                    .role(Role.MEMBRO)
+                    .emailVerified(true)
+                    .photoUrl(pictureUrl)
+                    .build();
+            return userRepository.save(newUser);
+        });
+
+        if (!user.isEmailVerified()) {
+            user.setEmailVerified(true);
+            user = userRepository.save(user);
+        }
+
+        UserDetails userDetails = org.springframework.security.core.userdetails.User
+                .withUsername(user.getEmail())
+                .password(user.getPassword() != null ? user.getPassword() : "")
+                .authorities("ROLE_" + user.getRole().name())
+                .build();
+
+        String token = jwtTokenProvider.generateToken(userDetails, user.getRole());
+
+        return AuthResponse.builder()
+                .token(token)
+                .id(user.getId())
+                .name(user.getName())
+                .email(user.getEmail())
+                .role(user.getRole().name())
+                .photoUrl(user.getPhotoUrl())
+                .status(user.getStatus())
+                .build();
     }
 
     public void forgotPassword(String email) {

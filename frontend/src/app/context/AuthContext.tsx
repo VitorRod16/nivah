@@ -15,6 +15,7 @@ type AuthContextType = {
   user: User | null;
   isAuthenticated: boolean;
   login: (email: string, password?: string) => Promise<{ success: boolean; error?: string; needsVerification?: boolean; email?: string }>;
+  loginWithGoogle: (idToken: string) => Promise<{ success: boolean; error?: string }>;
   register: (name: string, email: string, password?: string, role?: UserRole) => Promise<{ success: boolean; error?: string; needsVerification?: boolean; email?: string }>;
   verifyEmail: (email: string, code: string) => Promise<{ success: boolean; error?: string }>;
   resendCode: (email: string) => Promise<{ success: boolean; error?: string }>;
@@ -75,6 +76,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { success: false, needsVerification: true, email: data.email, error: "Email não verificado." };
       }
       if (!res.ok) return { success: false, error: data.message || "E-mail ou senha incorretos." };
+      localStorage.setItem("token", data.token);
+      setUser({ id: data.id, name: data.name, email: data.email, role: data.role ?? "MEMBRO", photoUrl: data.photoUrl, status: data.status });
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  const loginWithGoogle = async (idToken: string) => {
+    try {
+      const res = await fetch(`${BASE_URL}/auth/google`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken }),
+      });
+      const data = await safeJson(res);
+      if (!res.ok) return { success: false, error: data.message || "Erro ao autenticar com Google." };
       localStorage.setItem("token", data.token);
       setUser({ id: data.id, name: data.name, email: data.email, role: data.role ?? "MEMBRO", photoUrl: data.photoUrl, status: data.status });
       return { success: true };
@@ -184,7 +202,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, register, verifyEmail, resendCode, finalizeAuth, updateUser, updatePhoto, logout, isLoadingAuth }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, loginWithGoogle, register, verifyEmail, resendCode, finalizeAuth, updateUser, updatePhoto, logout, isLoadingAuth }}>
       {children}
     </AuthContext.Provider>
   );

@@ -26,7 +26,7 @@ public class User {
     private String email;
 
     @JsonIgnore
-    @Column(nullable = false)
+    @Column(nullable = true)
     private String password;
 
     @Builder.Default
@@ -48,6 +48,7 @@ public class User {
     private LocalDateTime resetTokenExpiry;
 
     @Builder.Default
+    @Column(name = "email_verified", nullable = false, columnDefinition = "boolean default false")
     private boolean emailVerified = false;
 
     @JsonIgnore
