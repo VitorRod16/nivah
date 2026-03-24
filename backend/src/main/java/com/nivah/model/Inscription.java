@@ -29,6 +29,12 @@ public class Inscription {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
+    // Camp participation fields (null for non-camp events)
+    // JOVEM | APOIO | APOIO_CASAL
+    private String tipoParticipante;
+    // MASCULINO | FEMININO (null for APOIO_CASAL)
+    private String sexo;
+
     @Builder.Default
     @Column(nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();

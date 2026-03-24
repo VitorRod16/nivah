@@ -20,4 +20,8 @@ public interface InscriptionRepository extends JpaRepository<Inscription, UUID> 
     int countByEvent(Event event);
 
     boolean existsByEventAndUser(Event event, User user);
+
+    int countByEventAndSexo(Event event, String sexo);
+
+    int countByEventAndTipoParticipante(Event event, String tipoParticipante);
 }

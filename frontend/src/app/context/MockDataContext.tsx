@@ -85,6 +85,16 @@ export type EventType = {
   inscricoesCount?: number;
   userInscrito?: boolean;
   igrejaId?: string;
+  // Camp fields
+  tipoEvento?: "NORMAL" | "ACAMPAMENTO";
+  vagasMasculino?: number;
+  vagasFeminino?: number;
+  quantidadeQuartos?: number;
+  inscricosMasculino?: number;
+  inscricosFeminino?: number;
+  inscricosCasais?: number;
+  userTipoParticipante?: string;
+  userSexo?: string;
 };
 
 export type Study = {
@@ -130,7 +140,7 @@ type MockDataContextType = {
   addEvent: (e: Omit<EventType, "id">) => Promise<void>;
   updateEvent: (id: string, updated: Partial<Omit<EventType, "id">>) => Promise<void>;
   deleteEvent: (id: string) => Promise<void>;
-  inscreverEvento: (id: string) => Promise<void>;
+  inscreverEvento: (id: string, tipoParticipante?: string, sexo?: string) => Promise<void>;
   desinscreverEvento: (id: string) => Promise<void>;
   studies: Study[];
   addStudy: (s: Omit<Study, "id">) => Promise<void>;
@@ -342,8 +352,12 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
     setEvents(prev => prev.filter(e => e.id !== id));
   };
 
-  const inscreverEvento = async (id: string) => {
-    const updated = await apiFetch<EventType>(`/events/${id}/inscricoes`, { method: "POST" });
+  const inscreverEvento = async (id: string, tipoParticipante?: string, sexo?: string) => {
+    const body = tipoParticipante ? JSON.stringify({ tipoParticipante, ...(sexo ? { sexo } : {}) }) : undefined;
+    const updated = await apiFetch<EventType>(`/events/${id}/inscricoes`, {
+      method: "POST",
+      ...(body ? { body } : {}),
+    });
     setEvents(prev => prev.map(e => e.id === id ? { ...e, ...updated } : e));
   };
 

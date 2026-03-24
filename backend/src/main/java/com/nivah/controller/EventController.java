@@ -14,6 +14,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -34,17 +35,20 @@ public class EventController {
         String email = userDetails.getUsername();
         List<Event> events = churchAccessService.isAdmin(email)
                 ? eventRepository.findAll()
-                : eventRepository.findByIgrejaIdIn(churchAccessService.getAccessibleIgrejaIds(email));
-        Optional<User> currentUser = userDetails != null
-                ? userRepository.findByEmail(userDetails.getUsername())
-                : Optional.empty();
+                : eventRepository.findByIgrejaIdInOrIgrejaIdIsNull(churchAccessService.getAccessibleIgrejaIds(email));
+
+        Optional<User> currentUser = userRepository.findByEmail(email);
 
         List<EventResponse> responses = events.stream().map(e -> {
             int count = inscriptionRepository.countByEvent(e);
-            boolean userInscrito = currentUser
-                    .map(u -> inscriptionRepository.existsByEventAndUser(e, u))
-                    .orElse(false);
-            return EventResponse.from(e, count, userInscrito);
+            Inscription userInscription = currentUser
+                    .flatMap(u -> inscriptionRepository.findByEventAndUser(e, u))
+                    .orElse(null);
+            boolean isCamp = "ACAMPAMENTO".equals(e.getTipoEvento());
+            int inscM = isCamp ? inscriptionRepository.countByEventAndSexo(e, "MASCULINO") : 0;
+            int inscF = isCamp ? inscriptionRepository.countByEventAndSexo(e, "FEMININO") : 0;
+            int inscC = isCamp ? inscriptionRepository.countByEventAndTipoParticipante(e, "APOIO_CASAL") : 0;
+            return EventResponse.from(e, count, userInscription, inscM, inscF, inscC);
         }).toList();
 
         return ResponseEntity.ok(responses);
@@ -72,7 +76,11 @@ public class EventController {
     // — Inscrições —
 
     @PostMapping("/{id}/inscricoes")
-    public ResponseEntity<?> inscrever(@PathVariable UUID id, @AuthenticationPrincipal UserDetails userDetails) {
+    public ResponseEntity<?> inscrever(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestBody(required = false) Map<String, String> body) {
+
         Event event = eventRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Evento não encontrado."));
 
@@ -87,17 +95,66 @@ public class EventController {
             return ResponseEntity.badRequest().body(Map.of("error", "Você já está inscrito neste evento."));
         }
 
-        if (event.getMaxInscriptions() != null) {
-            int count = inscriptionRepository.countByEvent(event);
-            if (count >= event.getMaxInscriptions()) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Vagas esgotadas."));
+        boolean isCamp = "ACAMPAMENTO".equals(event.getTipoEvento());
+        String tipoParticipante = null;
+        String sexo = null;
+
+        if (isCamp) {
+            if (body == null || !body.containsKey("tipoParticipante")) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Tipo de participação é obrigatório para acampamentos."));
+            }
+            tipoParticipante = body.get("tipoParticipante");
+            if (!List.of("JOVEM", "APOIO", "APOIO_CASAL").contains(tipoParticipante)) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Tipo de participação inválido."));
+            }
+
+            if (!"APOIO_CASAL".equals(tipoParticipante)) {
+                sexo = body.get("sexo");
+                if (sexo == null || (!sexo.equals("MASCULINO") && !sexo.equals("FEMININO"))) {
+                    return ResponseEntity.badRequest().body(Map.of("error", "Sexo é obrigatório para este tipo de participação."));
+                }
+                if ("MASCULINO".equals(sexo) && event.getVagasMasculino() != null) {
+                    int used = inscriptionRepository.countByEventAndSexo(event, "MASCULINO");
+                    if (used >= event.getVagasMasculino()) {
+                        return ResponseEntity.badRequest().body(Map.of("error", "Vagas masculinas esgotadas."));
+                    }
+                }
+                if ("FEMININO".equals(sexo) && event.getVagasFeminino() != null) {
+                    int used = inscriptionRepository.countByEventAndSexo(event, "FEMININO");
+                    if (used >= event.getVagasFeminino()) {
+                        return ResponseEntity.badRequest().body(Map.of("error", "Vagas femininas esgotadas."));
+                    }
+                }
+            } else {
+                if (event.getQuantidadeQuartos() != null) {
+                    int used = inscriptionRepository.countByEventAndTipoParticipante(event, "APOIO_CASAL");
+                    if (used >= event.getQuantidadeQuartos()) {
+                        return ResponseEntity.badRequest().body(Map.of("error", "Quartos de casal esgotados."));
+                    }
+                }
+            }
+        } else {
+            if (event.getMaxInscriptions() != null) {
+                int count = inscriptionRepository.countByEvent(event);
+                if (count >= event.getMaxInscriptions()) {
+                    return ResponseEntity.badRequest().body(Map.of("error", "Vagas esgotadas."));
+                }
             }
         }
 
-        inscriptionRepository.save(Inscription.builder().event(event).user(user).build());
+        Inscription inscription = Inscription.builder()
+                .event(event)
+                .user(user)
+                .tipoParticipante(tipoParticipante)
+                .sexo(sexo)
+                .build();
+        inscriptionRepository.save(inscription);
 
         int count = inscriptionRepository.countByEvent(event);
-        return ResponseEntity.ok(EventResponse.from(event, count, true));
+        int inscM = isCamp ? inscriptionRepository.countByEventAndSexo(event, "MASCULINO") : 0;
+        int inscF = isCamp ? inscriptionRepository.countByEventAndSexo(event, "FEMININO") : 0;
+        int inscC = isCamp ? inscriptionRepository.countByEventAndTipoParticipante(event, "APOIO_CASAL") : 0;
+        return ResponseEntity.ok(EventResponse.from(event, count, inscription, inscM, inscF, inscC));
     }
 
     @DeleteMapping("/{id}/inscricoes")
@@ -111,8 +168,12 @@ public class EventController {
         inscriptionRepository.findByEventAndUser(event, user)
                 .ifPresent(inscriptionRepository::delete);
 
+        boolean isCamp = "ACAMPAMENTO".equals(event.getTipoEvento());
         int count = inscriptionRepository.countByEvent(event);
-        return ResponseEntity.ok(EventResponse.from(event, count, false));
+        int inscM = isCamp ? inscriptionRepository.countByEventAndSexo(event, "MASCULINO") : 0;
+        int inscF = isCamp ? inscriptionRepository.countByEventAndSexo(event, "FEMININO") : 0;
+        int inscC = isCamp ? inscriptionRepository.countByEventAndTipoParticipante(event, "APOIO_CASAL") : 0;
+        return ResponseEntity.ok(EventResponse.from(event, count, null, inscM, inscF, inscC));
     }
 
     @GetMapping("/{id}/inscricoes")
@@ -121,13 +182,17 @@ public class EventController {
                 .orElseThrow(() -> new IllegalArgumentException("Evento não encontrado."));
 
         List<Inscription> inscricoes = inscriptionRepository.findByEvent(event);
-        List<Map<String, Object>> result = inscricoes.stream().map(i -> Map.<String, Object>of(
-                "id", i.getId(),
-                "usuarioId", i.getUser().getId(),
-                "nome", i.getUser().getName(),
-                "email", i.getUser().getEmail(),
-                "createdAt", i.getCreatedAt().toString()
-        )).toList();
+        List<Map<String, Object>> result = inscricoes.stream().map(i -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", i.getId());
+            m.put("usuarioId", i.getUser().getId());
+            m.put("nome", i.getUser().getName());
+            m.put("email", i.getUser().getEmail());
+            m.put("createdAt", i.getCreatedAt().toString());
+            if (i.getTipoParticipante() != null) m.put("tipoParticipante", i.getTipoParticipante());
+            if (i.getSexo() != null) m.put("sexo", i.getSexo());
+            return m;
+        }).toList();
 
         return ResponseEntity.ok(result);
     }

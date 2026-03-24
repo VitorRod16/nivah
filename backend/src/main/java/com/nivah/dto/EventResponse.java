@@ -1,6 +1,7 @@
 package com.nivah.dto;
 
 import com.nivah.model.Event;
+import com.nivah.model.Inscription;
 import lombok.Data;
 
 import java.util.List;
@@ -22,7 +23,19 @@ public class EventResponse {
     private int inscricoesCount;
     private boolean userInscrito;
 
-    public static EventResponse from(Event e, int inscricoesCount, boolean userInscrito) {
+    // Camp fields
+    private String tipoEvento;
+    private Integer vagasMasculino;
+    private Integer vagasFeminino;
+    private Integer quantidadeQuartos;
+    private int inscricosMasculino;
+    private int inscricosFeminino;
+    private int inscricosCasais;
+    private String userTipoParticipante;
+    private String userSexo;
+
+    public static EventResponse from(Event e, int inscricoesCount, Inscription userInscription,
+                                      int inscricosMasculino, int inscricosFeminino, int inscricosCasais) {
         EventResponse r = new EventResponse();
         r.setId(e.getId());
         r.setTitle(e.getTitle());
@@ -35,7 +48,18 @@ public class EventResponse {
         r.setAllowInscriptions(e.isAllowInscriptions());
         r.setMaxInscriptions(e.getMaxInscriptions());
         r.setInscricoesCount(inscricoesCount);
-        r.setUserInscrito(userInscrito);
+        r.setUserInscrito(userInscription != null);
+        r.setTipoEvento(e.getTipoEvento() != null ? e.getTipoEvento() : "NORMAL");
+        r.setVagasMasculino(e.getVagasMasculino());
+        r.setVagasFeminino(e.getVagasFeminino());
+        r.setQuantidadeQuartos(e.getQuantidadeQuartos());
+        r.setInscricosMasculino(inscricosMasculino);
+        r.setInscricosFeminino(inscricosFeminino);
+        r.setInscricosCasais(inscricosCasais);
+        if (userInscription != null) {
+            r.setUserTipoParticipante(userInscription.getTipoParticipante());
+            r.setUserSexo(userInscription.getSexo());
+        }
         return r;
     }
 }

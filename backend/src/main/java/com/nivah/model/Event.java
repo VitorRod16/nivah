@@ -46,6 +46,15 @@ public class Event {
 
     private Integer maxInscriptions;
 
+    // Camp fields (tipoEvento = "ACAMPAMENTO")
+    @Builder.Default
+    @Column(nullable = false, columnDefinition = "varchar(20) default 'NORMAL'")
+    private String tipoEvento = "NORMAL";
+
+    private Integer vagasMasculino;
+    private Integer vagasFeminino;
+    private Integer quantidadeQuartos;
+
     @Builder.Default
     @ElementCollection
     @CollectionTable(name = "event_ministry_ids", joinColumns = @JoinColumn(name = "event_id"))
