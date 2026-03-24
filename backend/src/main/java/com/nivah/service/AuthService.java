@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -336,6 +337,7 @@ public class AuthService {
                 .build();
     }
 
+    @Async
     public void forgotPassword(String email) {
         userRepository.findByEmail(email.trim().toLowerCase()).ifPresent(user -> {
             String token = UUID.randomUUID().toString();
