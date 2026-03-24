@@ -63,8 +63,11 @@ YearView.navigate = (date: Date, action: string) => {
   }
 };
 
+const CHURCH_COLORS = ['#3b82f6','#ef4444','#10b981','#f59e0b','#8b5cf6','#ec4899','#14b8a6','#f97316'];
+const GLOBAL_COLOR = '#6366f1';
+
 export function Calendar() {
-  const { events, addEvent, updateEvent, inscreverEvento, desinscreverEvento, ministries } = useMockData();
+  const { events, addEvent, updateEvent, inscreverEvento, desinscreverEvento, ministries, igrejas } = useMockData();
   const { user } = useAuth();
   const { canManage } = useRole();
   const { activeIgreja } = useActiveChurch();
@@ -93,6 +96,20 @@ export function Calendar() {
   const [vagasMasculino, setVagasMasculino] = useState("");
   const [vagasFeminino, setVagasFeminino] = useState("");
   const [quantidadeQuartos, setQuantidadeQuartos] = useState("");
+  const [hiddenChurches, setHiddenChurches] = useState<Set<string>>(new Set());
+
+  const churchColorMap = useMemo(() => {
+    const map = new Map<string, string>();
+    igrejas.forEach((ig, i) => map.set(ig.id, CHURCH_COLORS[i % CHURCH_COLORS.length]));
+    return map;
+  }, [igrejas]);
+
+  const getEventColor = (igrejaId?: string) =>
+    igrejaId ? (churchColorMap.get(igrejaId) ?? GLOBAL_COLOR) : GLOBAL_COLOR;
+
+  const toggleChurch = (id: string) =>
+    setHiddenChurches(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
   // Camp inscription modal state
   const [showCampModal, setShowCampModal] = useState(false);
   const [campTipo, setCampTipo] = useState<"JOVEM" | "APOIO" | "APOIO_CASAL">("JOVEM");
@@ -212,11 +229,12 @@ export function Calendar() {
 
   const calendarEvents = useMemo(() => events
     .filter(e => !e.cancelled)
+    .filter(e => !hiddenChurches.has(e.igrejaId ?? 'global'))
     .map(e => {
       const start = new Date(e.date);
       const end = e.endDate ? new Date(e.endDate) : new Date(start.getTime() + 2 * 60 * 60 * 1000);
       return { id: e.id, title: e.title, start, end, resource: e };
-    }), [events]);
+    }), [events, hiddenChurches]);
 
   // Sync selectedEvent with live events data
   const liveSelected = useMemo(() => {
@@ -258,6 +276,36 @@ export function Calendar() {
           </button>
         )}
       </div>
+
+      {/* Church color legend & filter */}
+      {igrejas.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <span className="text-xs text-muted-foreground font-medium">Campos:</span>
+          {igrejas.map(ig => {
+            const color = churchColorMap.get(ig.id) ?? GLOBAL_COLOR;
+            const hidden = hiddenChurches.has(ig.id);
+            return (
+              <button key={ig.id} onClick={() => toggleChurch(ig.id)}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${hidden ? 'opacity-40' : ''}`}
+                style={{ borderColor: color, color: hidden ? undefined : color, backgroundColor: hidden ? undefined : `${color}18` }}>
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                {ig.nome}
+              </button>
+            );
+          })}
+          {events.some(e => !e.igrejaId) && (() => {
+            const hidden = hiddenChurches.has('global');
+            return (
+              <button onClick={() => toggleChurch('global')}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${hidden ? 'opacity-40' : ''}`}
+                style={{ borderColor: GLOBAL_COLOR, color: hidden ? undefined : GLOBAL_COLOR, backgroundColor: hidden ? undefined : `${GLOBAL_COLOR}18` }}>
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: GLOBAL_COLOR }} />
+                Geral / Acampamento
+              </button>
+            );
+          })()}
+        </div>
+      )}
 
       {/* Form */}
       {isAdding && (
@@ -585,7 +633,7 @@ export function Calendar() {
           .rbc-toolbar button { border-radius: 6px; padding: 6px 12px; color: var(--foreground); }
           .rbc-toolbar button:active, .rbc-toolbar button.rbc-active { background-color: var(--primary); color: var(--primary-foreground); border-color: var(--primary); box-shadow: none; }
           .rbc-toolbar button:focus { outline: none; }
-          .rbc-event { background-color: var(--primary); border-radius: 4px; padding: 2px 6px; }
+          .rbc-event { border-radius: 4px; padding: 2px 6px; border: none !important; }
           .rbc-today { background-color: hsl(var(--primary) / 0.05); }
           .rbc-off-range-bg { background-color: hsl(var(--muted) / 0.3); }
           .rbc-header { padding: 8px 0; font-weight: 600; text-transform: capitalize; border-bottom: 1px solid var(--border) !important; }
@@ -615,6 +663,10 @@ export function Calendar() {
           date={date}
           onNavigate={setDate}
           onSelectEvent={event => { setSelectedEvent(event); setIsAdding(false); setShowInscritos(false); }}
+          eventPropGetter={(event: any) => {
+            const color = getEventColor(event.resource?.igrejaId);
+            return { style: { backgroundColor: color, borderColor: color } };
+          }}
           culture="pt-BR"
           popup
           selectable

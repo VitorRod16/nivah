@@ -1,8 +1,31 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useMockData } from "../context/MockDataContext";
 import { useActiveChurch } from "../context/ChurchContext";
 import { Card } from "../components/ui/card";
-import { Music, Plus, Mic, Link as LinkIcon, ExternalLink, FileText, ChevronDown, ChevronUp } from "lucide-react";
+import { Music, Plus, Mic, Link as LinkIcon, ExternalLink, FileText, ChevronDown, ChevronUp, Bold, Italic } from "lucide-react";
+
+function renderLyrics(text: string) {
+  return text.split('\n').map((line, i) => {
+    if (/^\[.+\]$/.test(line.trim())) {
+      return (
+        <div key={i} className="text-primary font-semibold text-xs uppercase tracking-wider mt-4 mb-1 first:mt-0">
+          {line.trim().slice(1, -1)}
+        </div>
+      );
+    }
+    if (line.trim() === '') return <div key={i} className="h-3" />;
+    const parts = line.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
+    return (
+      <div key={i}>
+        {parts.map((part, j) => {
+          if (part.startsWith('**') && part.endsWith('**')) return <strong key={j}>{part.slice(2, -2)}</strong>;
+          if (part.startsWith('*') && part.endsWith('*')) return <em key={j}>{part.slice(1, -1)}</em>;
+          return <span key={j}>{part}</span>;
+        })}
+      </div>
+    );
+  });
+}
 
 function SongCard({ song }: { song: any }) {
   const [showLyrics, setShowLyrics] = useState(false);
@@ -53,10 +76,8 @@ function SongCard({ song }: { song: any }) {
       </div>
 
       {showLyrics && song.lyrics && (
-        <div className="mt-4 pt-4 border-t border-border">
-          <pre className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed font-sans">
-            {song.lyrics}
-          </pre>
+        <div className="mt-4 pt-4 border-t border-border text-sm text-muted-foreground leading-relaxed">
+          {renderLyrics(song.lyrics)}
         </div>
       )}
     </Card>
@@ -72,6 +93,20 @@ export function Worship() {
   const [artist, setArtist] = useState("");
   const [link, setLink] = useState("");
   const [lyrics, setLyrics] = useState("");
+  const lyricsRef = useRef<HTMLTextAreaElement>(null);
+
+  const wrapSelection = (before: string, after: string) => {
+    const el = lyricsRef.current;
+    if (!el) return;
+    const s = el.selectionStart;
+    const e = el.selectionEnd;
+    const selected = lyrics.slice(s, e);
+    setLyrics(lyrics.slice(0, s) + before + selected + after + lyrics.slice(e));
+    setTimeout(() => {
+      el.focus();
+      el.setSelectionRange(s + before.length, s + before.length + selected.length);
+    }, 0);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -142,10 +177,27 @@ export function Worship() {
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Letra da Música</label>
+              <div className="flex items-center gap-1 px-2 py-1 border border-b-0 rounded-t-md bg-muted">
+                <button type="button" title="Negrito (**texto**)" onClick={() => wrapSelection('**', '**')}
+                  className="p-1.5 rounded hover:bg-accent transition-colors">
+                  <Bold className="w-3.5 h-3.5" />
+                </button>
+                <button type="button" title="Itálico (*texto*)" onClick={() => wrapSelection('*', '*')}
+                  className="p-1.5 rounded hover:bg-accent transition-colors">
+                  <Italic className="w-3.5 h-3.5" />
+                </button>
+                <div className="w-px h-4 bg-border mx-1" />
+                <button type="button" title="Título de seção ([Refrão])" onClick={() => wrapSelection('[', ']')}
+                  className="px-2 py-1 text-xs rounded hover:bg-accent transition-colors font-medium">
+                  [Seção]
+                </button>
+                <span className="ml-auto text-xs text-muted-foreground pr-1">**negrito** *itálico* [Refrão]</span>
+              </div>
               <textarea
+                ref={lyricsRef}
                 value={lyrics}
                 onChange={(e) => setLyrics(e.target.value)}
-                className="w-full px-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary min-h-[200px] resize-y font-mono text-sm"
+                className="w-full px-3 py-2 border rounded-b-md rounded-t-none bg-background focus:outline-none focus:ring-2 focus:ring-primary min-h-[200px] resize-y font-mono text-sm"
                 placeholder="Cole ou escreva a letra aqui..."
               />
             </div>
