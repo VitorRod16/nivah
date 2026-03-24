@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { maskPhone } from "../utils/masks";
 import { useMockData } from "../context/MockDataContext";
 import { Card } from "../components/ui/card";
 import { Users, Plus, Mail, Phone, MapPin, Edit2, Trash2 } from "lucide-react";
@@ -109,7 +110,7 @@ export function Members() {
                 <input
                   type="tel"
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  onChange={(e) => setPhone(maskPhone(e.target.value))}
                   className="w-full px-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                   placeholder="(00) 00000-0000"
                 />

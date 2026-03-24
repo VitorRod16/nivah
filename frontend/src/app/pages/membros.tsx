@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { maskPhone } from '../utils/masks';
 import { Users, Mail, Phone, Plus, Trash2, Search, X, Check, User, Pencil, Tag, Crown } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Input } from '../components/ui/input';
@@ -360,7 +361,7 @@ export function Membros() {
               <div className="relative">
                 <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input type="tel" placeholder="(61) 99999-9999" value={form.phone}
-                  onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+                  onChange={e => setForm(f => ({ ...f, phone: maskPhone(e.target.value) }))}
                   className="w-full pl-9 pr-3 py-2 rounded-md border border-border bg-input text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
               </div>
             </div>
