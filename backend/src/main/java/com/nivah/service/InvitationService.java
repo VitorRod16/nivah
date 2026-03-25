@@ -30,7 +30,7 @@ public class InvitationService {
     private final MemberRepository memberRepository;
     private final InvitationRepository invitationRepository;
 
-    @Value("${spring.mail.username}")
+    @Value("${app.mail.from:onboarding@resend.dev}")
     private String fromEmail;
 
     public List<Invitation> findAll() {
