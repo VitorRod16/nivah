@@ -48,7 +48,7 @@ public class Event {
 
     // Camp fields (tipoEvento = "ACAMPAMENTO")
     @Builder.Default
-    @Column(nullable = false, columnDefinition = "varchar(20) default 'NORMAL'")
+    @Column(nullable = false, length = 20)
     private String tipoEvento = "NORMAL";
 
     private Integer vagasMasculino;

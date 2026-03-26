@@ -8,15 +8,16 @@ import com.nivah.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import org.springframework.web.client.RestTemplate;
 
-import jakarta.mail.internet.MimeMessage;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
@@ -26,9 +27,12 @@ import java.util.stream.Collectors;
 @Slf4j
 public class InvitationService {
 
-    private final JavaMailSender mailSender;
+    private final RestTemplate restTemplate;
     private final MemberRepository memberRepository;
     private final InvitationRepository invitationRepository;
+
+    @Value("${resend.api.key:}")
+    private String apiKey;
 
     @Value("${app.mail.from:onboarding@resend.dev}")
     private String fromEmail;
@@ -132,14 +136,22 @@ public class InvitationService {
         int sent = 0;
         for (Member member : recipients) {
             try {
-                MimeMessage mail = mailSender.createMimeMessage();
-                MimeMessageHelper helper = new MimeMessageHelper(mail, true, "UTF-8");
-                helper.setFrom(fromEmail);
-                helper.setTo(member.getEmail());
-                helper.setSubject(subject);
-                helper.setText(buildEmailHtml(member.getName(), request), true);
-                helper.addInline("logo", new ClassPathResource("logo.png"));
-                mailSender.send(mail);
+                HttpHeaders headers = new HttpHeaders();
+                headers.setContentType(MediaType.APPLICATION_JSON);
+                headers.setBearerAuth(apiKey);
+
+                Map<String, Object> body = Map.of(
+                        "from", fromEmail,
+                        "to", new String[]{member.getEmail()},
+                        "subject", subject,
+                        "html", buildEmailHtml(member.getName(), request)
+                );
+
+                restTemplate.postForObject(
+                        "https://api.resend.com/emails",
+                        new HttpEntity<>(body, headers),
+                        Map.class
+                );
                 sent++;
             } catch (Exception e) {
                 log.error("Falha ao enviar e-mail para {}: {}", member.getEmail(), e.getMessage());

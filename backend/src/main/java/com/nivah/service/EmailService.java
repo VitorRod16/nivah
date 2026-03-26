@@ -3,50 +3,58 @@ package com.nivah.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
-import jakarta.mail.internet.MimeMessage;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class EmailService {
 
-    private final JavaMailSender mailSender;
+    private final RestTemplate restTemplate;
+
+    @Value("${resend.api.key:}")
+    private String apiKey;
 
     @Value("${app.mail.from:onboarding@resend.dev}")
     private String fromEmail;
 
     @Async
     public void sendVerificationEmail(String email, String name, String code) {
-        try {
-            MimeMessage mail = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(mail, true, "UTF-8");
-            helper.setFrom(fromEmail);
-            helper.setTo(email);
-            helper.setSubject("Verificação de email — Nivah");
-            helper.setText(buildVerificationEmailHtml(name, code), true);
-            mailSender.send(mail);
-        } catch (Exception e) {
-            log.error("Falha ao enviar email de verificação para {}: {}", email, e.getMessage());
-        }
+        send(email, "Verificação de email — Nivah", buildVerificationEmailHtml(name, code));
     }
 
     @Async
     public void sendPasswordResetEmail(String email, String name, String link) {
+        send(email, "Redefinição de senha — Nivah", buildResetEmailHtml(name, link));
+    }
+
+    private void send(String to, String subject, String html) {
         try {
-            MimeMessage mail = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(mail, true, "UTF-8");
-            helper.setFrom(fromEmail);
-            helper.setTo(email);
-            helper.setSubject("Redefinição de senha — Nivah");
-            helper.setText(buildResetEmailHtml(name, link), true);
-            mailSender.send(mail);
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.setBearerAuth(apiKey);
+
+            Map<String, Object> body = Map.of(
+                    "from", fromEmail,
+                    "to", new String[]{to},
+                    "subject", subject,
+                    "html", html
+            );
+
+            restTemplate.postForObject(
+                    "https://api.resend.com/emails",
+                    new HttpEntity<>(body, headers),
+                    Map.class
+            );
         } catch (Exception e) {
-            log.error("Falha ao enviar email de reset para {}: {}", email, e.getMessage());
+            log.error("Falha ao enviar email para {}: {}", to, e.getMessage());
         }
     }
 

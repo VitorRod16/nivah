@@ -1,62 +1,71 @@
 package com.nivah.service;
 
-import jakarta.mail.internet.MimeMessage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.http.ResponseEntity;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.client.RestTemplate;
 
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class EmailServiceTest {
 
-    @Mock JavaMailSender mailSender;
-    @Mock MimeMessage mimeMessage;
+    @Mock RestTemplate restTemplate;
 
     @InjectMocks EmailService emailService;
 
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(emailService, "fromEmail", "noreply@nivah.com");
-        when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
+        ReflectionTestUtils.setField(emailService, "apiKey", "re_test_key");
+        ReflectionTestUtils.setField(emailService, "fromEmail", "onboarding@resend.dev");
     }
 
     @Test
-    void sendVerificationEmail_callsMailSenderSend() {
+    void sendVerificationEmail_callsResendApi() {
+        when(restTemplate.postForObject(any(String.class), any(), eq(java.util.Map.class)))
+                .thenReturn(java.util.Map.of("id", "abc123"));
+
         emailService.sendVerificationEmail("user@test.com", "João", "123456");
 
-        verify(mailSender).send(mimeMessage);
+        verify(restTemplate).postForObject(
+                eq("https://api.resend.com/emails"), any(), eq(java.util.Map.class));
     }
 
     @Test
-    void sendPasswordResetEmail_callsMailSenderSend() {
+    void sendPasswordResetEmail_callsResendApi() {
+        when(restTemplate.postForObject(any(String.class), any(), eq(java.util.Map.class)))
+                .thenReturn(java.util.Map.of("id", "abc123"));
+
         emailService.sendPasswordResetEmail("user@test.com", "Maria", "https://nivah.vercel.app/reset-password?token=abc");
 
-        verify(mailSender).send(mimeMessage);
+        verify(restTemplate).postForObject(
+                eq("https://api.resend.com/emails"), any(), eq(java.util.Map.class));
     }
 
     @Test
-    void sendVerificationEmail_doesNotThrowWhenMailFails() {
-        when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
-        doThrow(new RuntimeException("SMTP error")).when(mailSender).send(any(MimeMessage.class));
+    void sendVerificationEmail_doesNotThrowWhenApiFails() {
+        when(restTemplate.postForObject(any(String.class), any(), eq(java.util.Map.class)))
+                .thenThrow(new RuntimeException("API error"));
 
-        // Should not propagate exception — only log it
-        org.assertj.core.api.Assertions.assertThatCode(
+        assertThatCode(
                 () -> emailService.sendVerificationEmail("fail@test.com", "Fail", "000000")
         ).doesNotThrowAnyException();
     }
 
     @Test
-    void sendPasswordResetEmail_doesNotThrowWhenMailFails() {
-        when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
-        doThrow(new RuntimeException("SMTP error")).when(mailSender).send(any(MimeMessage.class));
+    void sendPasswordResetEmail_doesNotThrowWhenApiFails() {
+        when(restTemplate.postForObject(any(String.class), any(), eq(java.util.Map.class)))
+                .thenThrow(new RuntimeException("API error"));
 
-        org.assertj.core.api.Assertions.assertThatCode(
+        assertThatCode(
                 () -> emailService.sendPasswordResetEmail("fail@test.com", "Fail", "http://link")
         ).doesNotThrowAnyException();
     }
