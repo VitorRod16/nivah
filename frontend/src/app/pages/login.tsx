@@ -43,6 +43,9 @@ export function Login() {
     phone: string;
   } | null>(null);
 
+  // Resend cooldown
+  const [resendCooldown, setResendCooldown] = useState(0);
+
   // Forgot password
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
@@ -215,8 +218,18 @@ export function Login() {
 
   const handleResendCode = async () => {
     const result = await resendCode(verificationEmail);
-    if (result.success) toast.success("Código reenviado para " + verificationEmail);
-    else toast.error(result.error || "Erro ao reenviar código.");
+    if (result.success) {
+      toast.success("Código reenviado para " + verificationEmail);
+      setResendCooldown(30);
+      const interval = setInterval(() => {
+        setResendCooldown(prev => {
+          if (prev <= 1) { clearInterval(interval); return 0; }
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      toast.error(result.error || "Erro ao reenviar código.");
+    }
   };
 
   const handleAddNewIgreja = (e: React.FormEvent) => {
@@ -285,9 +298,10 @@ export function Login() {
             <p className="text-sm text-muted-foreground">Não recebeu o código?</p>
             <button
               onClick={handleResendCode}
-              className="text-sm text-primary hover:underline font-medium"
+              disabled={resendCooldown > 0}
+              className="text-sm text-primary hover:underline font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline"
             >
-              Reenviar código
+              {resendCooldown > 0 ? `Reenviar em ${resendCooldown}s` : "Reenviar código"}
             </button>
           </div>
         </div>
