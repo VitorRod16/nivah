@@ -36,7 +36,6 @@ public class EmailService {
     }
 
     private void send(String to, String subject, String html) {
-        log.info("Tentando enviar email para {} | apiKey vazia: {}", to, !org.springframework.util.StringUtils.hasText(apiKey));
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
@@ -49,12 +48,11 @@ public class EmailService {
                     "htmlContent", html
             );
 
-            Map<?, ?> response = restTemplate.postForObject(
+            restTemplate.postForObject(
                     "https://api.brevo.com/v3/smtp/email",
                     new HttpEntity<>(body, headers),
                     Map.class
             );
-            log.info("Email enviado para {}. Resposta Brevo: {}", to, response);
         } catch (Exception e) {
             log.error("Falha ao enviar email para {}: {}", to, e.getMessage());
         }
