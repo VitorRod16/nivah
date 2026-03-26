@@ -49,11 +49,12 @@ public class EmailService {
                     "htmlContent", html
             );
 
-            restTemplate.postForObject(
+            Map<?, ?> response = restTemplate.postForObject(
                     "https://api.brevo.com/v3/smtp/email",
                     new HttpEntity<>(body, headers),
                     Map.class
             );
+            log.info("Email enviado para {}. Resposta Brevo: {}", to, response);
         } catch (Exception e) {
             log.error("Falha ao enviar email para {}: {}", to, e.getMessage());
         }
