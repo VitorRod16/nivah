@@ -31,7 +31,7 @@ public class InvitationService {
     private final MemberRepository memberRepository;
     private final InvitationRepository invitationRepository;
 
-    @Value("${resend.api.key:}")
+    @Value("${brevo.api.key:}")
     private String apiKey;
 
     @Value("${app.mail.from:onboarding@resend.dev}")
@@ -138,17 +138,17 @@ public class InvitationService {
             try {
                 HttpHeaders headers = new HttpHeaders();
                 headers.setContentType(MediaType.APPLICATION_JSON);
-                headers.setBearerAuth(apiKey);
+                headers.set("api-key", apiKey);
 
                 Map<String, Object> body = Map.of(
-                        "from", fromEmail,
-                        "to", new String[]{member.getEmail()},
+                        "sender", Map.of("name", "Nivah", "email", fromEmail),
+                        "to", new Object[]{Map.of("email", member.getEmail())},
                         "subject", subject,
-                        "html", buildEmailHtml(member.getName(), request)
+                        "htmlContent", buildEmailHtml(member.getName(), request)
                 );
 
                 restTemplate.postForObject(
-                        "https://api.resend.com/emails",
+                        "https://api.brevo.com/v3/smtp/email",
                         new HttpEntity<>(body, headers),
                         Map.class
                 );

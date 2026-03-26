@@ -19,10 +19,10 @@ public class EmailService {
 
     private final RestTemplate restTemplate;
 
-    @Value("${resend.api.key:}")
+    @Value("${brevo.api.key:}")
     private String apiKey;
 
-    @Value("${app.mail.from:onboarding@resend.dev}")
+    @Value("${app.mail.from:noreply@nivah.app}")
     private String fromEmail;
 
     @Async
@@ -39,17 +39,17 @@ public class EmailService {
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.setBearerAuth(apiKey);
+            headers.set("api-key", apiKey);
 
             Map<String, Object> body = Map.of(
-                    "from", fromEmail,
-                    "to", new String[]{to},
+                    "sender", Map.of("name", "Nivah", "email", fromEmail),
+                    "to", new Object[]{Map.of("email", to)},
                     "subject", subject,
-                    "html", html
+                    "htmlContent", html
             );
 
             restTemplate.postForObject(
-                    "https://api.resend.com/emails",
+                    "https://api.brevo.com/v3/smtp/email",
                     new HttpEntity<>(body, headers),
                     Map.class
             );

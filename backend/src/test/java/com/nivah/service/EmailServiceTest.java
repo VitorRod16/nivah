@@ -24,7 +24,7 @@ class EmailServiceTest {
 
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(emailService, "apiKey", "re_test_key");
+        ReflectionTestUtils.setField(emailService, "apiKey", "brevo_test_key");
         ReflectionTestUtils.setField(emailService, "fromEmail", "onboarding@resend.dev");
     }
 
@@ -36,7 +36,7 @@ class EmailServiceTest {
         emailService.sendVerificationEmail("user@test.com", "João", "123456");
 
         verify(restTemplate).postForObject(
-                eq("https://api.resend.com/emails"), any(), eq(java.util.Map.class));
+                eq("https://api.brevo.com/v3/smtp/email"), any(), eq(java.util.Map.class));
     }
 
     @Test
@@ -47,7 +47,7 @@ class EmailServiceTest {
         emailService.sendPasswordResetEmail("user@test.com", "Maria", "https://nivah.vercel.app/reset-password?token=abc");
 
         verify(restTemplate).postForObject(
-                eq("https://api.resend.com/emails"), any(), eq(java.util.Map.class));
+                eq("https://api.brevo.com/v3/smtp/email"), any(), eq(java.util.Map.class));
     }
 
     @Test
