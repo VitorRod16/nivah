@@ -36,6 +36,7 @@ public class EmailService {
     }
 
     private void send(String to, String subject, String html) {
+        log.info("Tentando enviar email para {} | apiKey vazia: {}", to, !org.springframework.util.StringUtils.hasText(apiKey));
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
