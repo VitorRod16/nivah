@@ -47,7 +47,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/auth/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/ministries").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/igrejas").permitAll()
-                        .requestMatchers("/api/bible/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/bible/seed").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/bible/seed/status").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/bible/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session

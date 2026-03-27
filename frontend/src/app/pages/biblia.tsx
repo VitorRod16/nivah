@@ -9,12 +9,8 @@ type Verse = {
   text: string;
 };
 
-type GetBibleResponse = {
-  book: number;
-  chapter: number;
-  name: string;
-  verses: Record<string, { book: number; chapter: number; verse: number; text: string }>;
-};
+// bolls.life retorna um array de versículos
+type BollsVerse = { pk: number; verse: number; text: string };
 
 type Book = {
   name: string;
@@ -98,16 +94,14 @@ const NT_BOOKS = BOOKS.filter(b => b.testament === 'NT');
 
 // Traduções disponíveis no getbible.net com textos em português
 const TRANSLATIONS = [
-  { id: 'almeida', label: 'ARC — Almeida Revista e Corrigida', abbr: 'ARC' },
-  { id: 'ara',     label: 'ARA — Almeida Revista e Atualizada', abbr: 'ARA' },
-  { id: 'nvi',     label: 'NVI — Nova Versão Internacional', abbr: 'NVI' },
-  { id: 'acf',     label: 'ACF — Almeida Corrigida Fiel', abbr: 'ACF' },
+  { id: 'ARC', label: 'ARC — Almeida Revista e Corrigida', abbr: 'ARC' },
+  { id: 'NVI', label: 'NVI — Nova Versão Internacional',   abbr: 'NVI' },
 ];
 
 export function Biblia() {
   const [bookIndex, setBookIndex] = useState(39); // João
   const [chapter, setChapter] = useState(3);
-  const [translation, setTranslation] = useState('almeida');
+  const [translation, setTranslation] = useState('ARC');
   const [verses, setVerses] = useState<Verse[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -131,8 +125,8 @@ export function Biblia() {
         token ? { headers: { Authorization: `Bearer ${token}` } } : undefined
       );
       if (!res.ok) throw new Error('Capítulo não encontrado.');
-      const data: GetBibleResponse = await res.json();
-      const parsed = Object.values(data.verses)
+      const data: BollsVerse[] = await res.json();
+      const parsed = data
         .map(v => ({ verse: v.verse, text: v.text.trim() }))
         .sort((a, b) => a.verse - b.verse);
       setVerses(parsed);
