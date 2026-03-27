@@ -7,7 +7,6 @@ import com.nivah.repository.BibleVerseRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -26,23 +25,23 @@ public class BibleSeedService {
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
 
-    @Value("${bible.api.token:}")
-    private String apiToken;
+    // MaatheusGois — aa, acf, arc, kja, nvi  (lowercase, formato: [{abbrev, chapters:[[]]}])
+    private static final String MAATHEUS_URL =
+        "https://raw.githubusercontent.com/MaatheusGois/bible/main/versions/pt-br/%s.json";
 
-    // Número de capítulos por livro (índice 0 = Gênesis)
-    private static final int[] CHAPTER_COUNTS = {
-        50, 40, 27, 36, 34, 24, 21,  4, 31, 24,  // 1–10
-        22, 25, 29, 36, 10, 13, 10, 42,150, 31,  // 11–20
-        12,  8, 66, 52,  5, 48, 12, 14,  3,  9,  // 21–30
-         1,  4,  7,  3,  3,  3,  2, 14,  4,      // 31–39
-        28, 16, 24, 21, 28, 16, 16, 13,  6,  6,  // 40–49
-         4,  4,  5,  3,  6,  4,  3,  1, 13,  5,  // 50–59
-         5,  3,  5,  1,  1,  1, 22              // 60–66
-    };
+    // damarals/biblias — ARA, NTLH, NAA, AS21, TB, NVT, NBV, ACF, ARC, NVI...  (UPPERCASE)
+    // Mesmo formato do MaatheusGois
+    private static final String DAMARALS_URL =
+        "https://raw.githubusercontent.com/damarals/biblias/main/inst/json/%s.json";
 
+    // Fallback por livro (MaatheusGois)
+    private static final String MAATHEUS_BOOK_URL =
+        "https://raw.githubusercontent.com/MaatheusGois/bible/main/versions/pt-br/%s/%s/%s.json";
+
+    // Abreviações PT por livro (índice 0 = Gênesis) — usadas no fallback
     private static final String[] ABBREVS = {
         "gn","ex","lv","nm","dt","js","jz","rt","1sm","2sm",
-        "1rs","2rs","1cr","2cr","ed","ne","et","jó","sl","pv",
+        "1rs","2rs","1cr","2cr","ed","ne","et","jo","sl","pv",
         "ec","ct","is","jr","lm","ez","dn","os","jl","am",
         "ob","jn","mq","na","hc","sf","ag","zc","ml",
         "mt","mc","lc","jo","at","rm","1co","2co","gl","ef",
@@ -50,106 +49,110 @@ public class BibleSeedService {
         "1pe","2pe","1jo","2jo","3jo","jd","ap"
     };
 
-    private static final String[] TRANSLATIONS = {"arc", "nvi", "ara", "acf"};
+    // MaatheusGois: arc, nvi, acf, aa, kja
+    // damarals:     ara, ntlh, naa
+    private static final String[] TRANSLATIONS = {"arc", "nvi", "acf", "aa", "kja", "ara", "ntlh", "naa"};
 
     private final AtomicBoolean seeding = new AtomicBoolean(false);
     private final AtomicReference<String> status = new AtomicReference<>("idle");
 
     @PostConstruct
     public void autoSeedIfNeeded() {
-        boolean missingData = false;
         for (String t : TRANSLATIONS) {
             if (bibleVerseRepository.countByTranslation(t) == 0) {
-                missingData = true;
-                break;
+                log.info("Dados da Bíblia incompletos — iniciando seed automático em background...");
+                startSeed(false);
+                return;
             }
         }
-        if (missingData) {
-            log.info("Dados da Bíblia incompletos — iniciando seed automático em background...");
-            startSeed(false);
-        }
     }
 
-    public boolean isSeeding() {
-        return seeding.get();
-    }
-
-    public String getStatus() {
-        return status.get();
-    }
+    public boolean isSeeding() { return seeding.get(); }
+    public String getStatus()  { return status.get(); }
 
     public boolean startSeed(boolean force) {
-        if (!seeding.compareAndSet(false, true)) {
-            return false; // já em andamento
-        }
+        if (!seeding.compareAndSet(false, true)) return false;
         Thread.ofVirtual().start(() -> doSeed(force));
         return true;
     }
 
     private void doSeed(boolean force) {
         try {
-            int totalChapters = 0;
-            for (int c : CHAPTER_COUNTS) totalChapters += c;
-            int total = TRANSLATIONS.length * totalChapters;
-            int done = 0;
-
             for (String t : TRANSLATIONS) {
-                for (int book = 1; book <= 66; book++) {
-                    int chapters = CHAPTER_COUNTS[book - 1];
-                    for (int ch = 1; ch <= chapters; ch++) {
-                        if (!force && bibleVerseRepository.existsByTranslationAndBookAndChapter(t, book, ch)) {
-                            done++;
-                            continue;
-                        }
-                        try {
-                            String abbrev = ABBREVS[book - 1];
-                            String url = String.format(
-                                "https://www.abibliadigital.com.br/api/verses/%s/%s/%d", t, abbrev, ch);
-
-                            HttpHeaders headers = new HttpHeaders();
-                            headers.set("Accept", "application/json");
-                            if (!apiToken.isBlank()) headers.setBearerAuth(apiToken);
-
-                            ResponseEntity<String> resp = restTemplate.exchange(
-                                url, HttpMethod.GET, new HttpEntity<>(headers), String.class);
-
-                            JsonNode root = objectMapper.readTree(resp.getBody());
-                            JsonNode versesNode = root.get("verses");
-
-                            List<BibleVerse> verses = new ArrayList<>();
-                            for (JsonNode v : versesNode) {
-                                verses.add(new BibleVerse(
-                                    t, book, ch,
-                                    v.get("number").asInt(),
-                                    v.get("text").asText().trim()
-                                ));
-                            }
-                            bibleVerseRepository.saveAll(verses);
-                            done++;
-
-                            int pct = done * 100 / total;
-                            status.set(String.format("seeding: %d/%d (%d%%) — %s livro %d cap %d",
-                                done, total, pct, t.toUpperCase(), book, ch));
-
-                            Thread.sleep(600); // respeita rate limit da API
-                        } catch (Exception e) {
-                            log.warn("Seed falhou ({} {}/{}): {}", t, book, ch, e.getMessage());
-                            Thread.sleep(3000); // back-off em caso de erro
-                        }
-                    }
+                if (!force && bibleVerseRepository.countByTranslation(t) > 0) {
+                    log.info("Tradução {} já existe, pulando.", t.toUpperCase());
+                    continue;
                 }
-                log.info("Tradução {} concluída.", t.toUpperCase());
+                status.set("baixando " + t.toUpperCase() + "...");
+
+                // Tenta MaatheusGois (lowercase) depois damarals (UPPERCASE), depois fallback por livro
+                boolean ok = seedFromSingleFile(MAATHEUS_URL, t)
+                          || seedFromSingleFile(DAMARALS_URL, t.toUpperCase());
+                if (!ok) {
+                    log.warn("Arquivo único falhou para {}. Tentando fallback por livro...", t.toUpperCase());
+                    seedFromPerBookFiles(t);
+                }
+
+                log.info("Tradução {} concluída. Versículos: {}", t.toUpperCase(),
+                    bibleVerseRepository.countByTranslation(t));
             }
             status.set("completed");
             log.info("Seed da Bíblia concluído.");
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            status.set("interrupted");
         } catch (Exception e) {
             log.error("Seed falhou: {}", e.getMessage());
             status.set("error: " + e.getMessage());
         } finally {
             seeding.set(false);
+        }
+    }
+
+    private boolean seedFromSingleFile(String urlTemplate, String translationCode) {
+        try {
+            String url = String.format(urlTemplate, translationCode);
+            ResponseEntity<String> resp = restTemplate.getForEntity(url, String.class);
+            String body = resp.getBody();
+            if (body != null && body.startsWith("\uFEFF")) body = body.substring(1);
+            JsonNode booksArray = objectMapper.readTree(body);
+
+            if (!booksArray.isArray() || booksArray.isEmpty()) return false;
+
+            for (int bookIdx = 0; bookIdx < booksArray.size(); bookIdx++) {
+                JsonNode chaptersNode = booksArray.get(bookIdx).get("chapters");
+                saveChapters(translationCode.toLowerCase(), bookIdx + 1, chaptersNode);
+            }
+            return true;
+        } catch (Exception e) {
+            log.warn("seedFromSingleFile falhou ({}) : {}", translationCode, e.getMessage());
+            return false;
+        }
+    }
+
+    private void seedFromPerBookFiles(String translation) {
+        for (int bookIdx = 0; bookIdx < 66; bookIdx++) {
+            String abbrev = ABBREVS[bookIdx];
+            try {
+                String url = String.format(MAATHEUS_BOOK_URL, translation, abbrev, abbrev);
+                ResponseEntity<String> resp = restTemplate.getForEntity(url, String.class);
+                JsonNode root = objectMapper.readTree(resp.getBody());
+                saveChapters(translation, bookIdx + 1, root.get("chapters"));
+            } catch (Exception e) {
+                log.warn("Livro {} não encontrado para {}: {}", abbrev, translation, e.getMessage());
+            }
+        }
+    }
+
+    private void saveChapters(String translation, int bookNum, JsonNode chaptersNode) {
+        if (chaptersNode == null || !chaptersNode.isArray()) return;
+        for (int chIdx = 0; chIdx < chaptersNode.size(); chIdx++) {
+            JsonNode versesNode = chaptersNode.get(chIdx);
+            List<BibleVerse> verses = new ArrayList<>();
+            for (int vIdx = 0; vIdx < versesNode.size(); vIdx++) {
+                verses.add(new BibleVerse(
+                    translation, bookNum, chIdx + 1, vIdx + 1,
+                    versesNode.get(vIdx).asText().trim()
+                ));
+            }
+            bibleVerseRepository.saveAll(verses);
         }
     }
 }

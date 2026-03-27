@@ -92,10 +92,15 @@ const BOOKS: Book[] = [
 const AT_BOOKS = BOOKS.filter(b => b.testament === 'AT');
 const NT_BOOKS = BOOKS.filter(b => b.testament === 'NT');
 
-// Traduções disponíveis no getbible.net com textos em português
 const TRANSLATIONS = [
-  { id: 'ARC', label: 'ARC — Almeida Revista e Corrigida', abbr: 'ARC' },
-  { id: 'NVI', label: 'NVI — Nova Versão Internacional',   abbr: 'NVI' },
+  { id: 'ARC',  label: 'ARC — Almeida Revista e Corrigida'      },
+  { id: 'NVI',  label: 'NVI — Nova Versão Internacional'         },
+  { id: 'ACF',  label: 'ACF — Almeida Corrigida Fiel'           },
+  { id: 'AA',   label: 'AA — Almeida Antiga'                     },
+  { id: 'KJA',  label: 'KJA — King James Atualizada'            },
+  { id: 'ARA',  label: 'ARA — Almeida Revista e Atualizada'     },
+  { id: 'NTLH', label: 'NTLH — Nova Tradução na Linguagem de Hoje' },
+  { id: 'NAA',  label: 'NAA — Nova Almeida Atualizada'          },
 ];
 
 export function Biblia() {
@@ -202,7 +207,7 @@ export function Biblia() {
   };
 
   const copyVerse = (v: Verse) => {
-    const abbr = TRANSLATIONS.find(t => t.id === translation)?.abbr ?? translation.toUpperCase();
+    const abbr = translation.toUpperCase();
     const text = `"${v.text}" — ${book.name} ${chapter}:${v.verse} (${abbr})`;
     navigator.clipboard.writeText(text).then(() => {
       setCopiedVerse(v.verse);
