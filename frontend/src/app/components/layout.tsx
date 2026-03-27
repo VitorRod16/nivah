@@ -44,6 +44,7 @@ export function Layout() {
     { name: 'Liderança', href: '/leadership', icon: Crown, show: canManage },
     { name: 'Convites', href: '/invitations', icon: Mail, show: canManage },
     { name: 'Dízimos e Ofertas', href: '/dizimos', icon: DollarSign, show: true },
+    { name: 'Bíblia', href: '/biblia', icon: BookOpen, show: true },
     { name: 'Estudos', href: '/studies', icon: BookOpen, show: true },
     { name: 'Louvores', href: '/worship', icon: Music, show: true },
     { name: 'Buscar', href: '/search', icon: Search, show: true },

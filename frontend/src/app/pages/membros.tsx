@@ -301,7 +301,9 @@ export function Membros() {
                     </div>
                   </td>
                   {isAdmin && (
-                    <td className="px-4 py-3 text-muted-foreground text-xs hidden xl:table-cell">{m.igrejaName}</td>
+                    <td className="px-4 py-3 text-muted-foreground text-xs hidden xl:table-cell">
+                      {m.igrejaName ?? <span className="opacity-40">—</span>}
+                    </td>
                   )}
                   {canManage && (
                     <td className="px-4 py-3">

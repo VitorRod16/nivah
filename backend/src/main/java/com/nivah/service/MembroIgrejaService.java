@@ -9,8 +9,11 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -24,8 +27,19 @@ public class MembroIgrejaService {
 
     public List<MembroIgrejaResponse> findAll(String email) {
         User user = getUser(email);
+        if (user.getRole() == Role.ADMIN) {
+            List<MembroIgreja> membros = membroIgrejaRepository.findAll();
+            Set<UUID> linkedUserIds = membros.stream()
+                    .map(m -> m.getUsuario().getId())
+                    .collect(Collectors.toSet());
+            List<MembroIgrejaResponse> result = new ArrayList<>(membros.stream().map(MembroIgrejaResponse::from).toList());
+            userRepository.findAll().stream()
+                    .filter(u -> !linkedUserIds.contains(u.getId()))
+                    .map(MembroIgrejaResponse::fromUser)
+                    .forEach(result::add);
+            return result;
+        }
         List<MembroIgreja> membros = switch (user.getRole()) {
-            case ADMIN -> membroIgrejaRepository.findAll();
             case PASTOR -> {
                 List<Igreja> igrejas = igrejaRepository.findByPastoresContaining(user);
                 yield membroIgrejaRepository.findByIgrejaIn(igrejas);
@@ -35,6 +49,7 @@ public class MembroIgrejaService {
                         .stream().map(MembroIgreja::getIgreja).toList();
                 yield membroIgrejaRepository.findByIgrejaIn(igrejas);
             }
+            default -> List.of();
         };
         return membros.stream().map(MembroIgrejaResponse::from).toList();
     }

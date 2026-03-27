@@ -47,6 +47,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/auth/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/ministries").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/igrejas").permitAll()
+                        .requestMatchers("/api/bible/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session

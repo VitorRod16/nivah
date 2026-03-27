@@ -1,6 +1,7 @@
 package com.nivah.dto;
 
 import com.nivah.model.MembroIgreja;
+import com.nivah.model.User;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
@@ -38,6 +39,21 @@ public class MembroIgrejaResponse {
                 m.getPapeis().stream()
                         .map(p -> new PapelInfo(p.getId(), p.getNome()))
                         .toList()
+        );
+    }
+
+    public static MembroIgrejaResponse fromUser(User u) {
+        return new MembroIgrejaResponse(
+                u.getId(),
+                u.getId(),
+                u.getName(),
+                u.getEmail(),
+                null,
+                u.getPhotoUrl(),
+                u.getRole().name(),
+                null,
+                null,
+                List.of()
         );
     }
 }

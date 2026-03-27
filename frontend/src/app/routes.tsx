@@ -12,6 +12,7 @@ import { Studies } from "./pages/studies";
 import { Worship } from "./pages/worship";
 import { Search } from "./pages/search";
 import { Dizimos } from "./pages/dizimos";
+import { Biblia } from "./pages/biblia";
 import { NotFound } from "./pages/not-found";
 import { Login } from "./pages/login";
 import { ResetPassword } from "./pages/reset-password";
@@ -80,6 +81,7 @@ export const router = createBrowserRouter([
           { path: "worship", Component: Worship },
           { path: "search", Component: Search },
           { path: "dizimos", Component: Dizimos },
+          { path: "biblia", Component: Biblia },
           { path: "*", Component: NotFound },
         ],
       },

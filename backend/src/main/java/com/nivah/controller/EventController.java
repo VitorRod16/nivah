@@ -23,7 +23,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/events")
 @RequiredArgsConstructor
-public class EventController {
+ public class EventController {
 
     private final EventRepository eventRepository;
     private final InscriptionRepository inscriptionRepository;
