@@ -160,7 +160,8 @@ export function Biblia() {
   const [copiedVerse, setCopiedVerse] = useState<number | null>(null);
   const [searchRef, setSearchRef] = useState('');
   const [showBooks, setShowBooks] = useState(false);
-  const [highlights, setHighlights] = useState<Highlight[]>(loadHighlights);
+  // Quando logado, backend é a fonte de verdade (localStorage só para não-logados)
+  const [highlights, setHighlights] = useState<Highlight[]>(isLoggedIn() ? [] : loadHighlights);
   const [showHighlights, setShowHighlights] = useState(false);
   const [selectedVerses, setSelectedVerses] = useState<Set<number>>(new Set());
   const [isTouch, setIsTouch] = useState(false);
@@ -170,9 +171,11 @@ export function Biblia() {
     setIsTouch(window.matchMedia('(hover: none) and (pointer: coarse)').matches);
   }, []);
 
-  // Sincroniza destaques do backend na montagem
+  // Carrega destaques do backend na montagem
   useEffect(() => {
     if (!isLoggedIn()) return;
+    // Limpa localStorage residual — backend é a fonte de verdade
+    localStorage.removeItem(HIGHLIGHTS_KEY);
     fetch(`${API_BASE_URL}/bible/highlights`, { headers: authHeaders() })
       .then(r => r.ok ? r.json() : [])
       .then((data: Array<Highlight & { id: string }>) => {
@@ -182,7 +185,6 @@ export function Biblia() {
           serverId: h.id,
         }));
         setHighlights(remote);
-        saveHighlights(remote);
       })
       .catch(() => {});
   }, []);
@@ -289,48 +291,33 @@ export function Biblia() {
 
   const markVerse = async (v: Verse, colorId: string) => {
     const id = highlightId(v);
-    const existing = getHighlight(v);
-
-    // Remove versão antiga no backend se existir
-    if (existing?.serverId && isLoggedIn()) {
-      fetch(`${API_BASE_URL}/bible/highlights/${existing.serverId}`, {
-        method: 'DELETE', headers: authHeaders(),
-      }).catch(() => {});
-    }
-
     const newHighlight: Highlight = {
       id, translation, bookIndex, bookName: book.name,
       chapter, verse: v.verse, text: v.text, color: colorId,
     };
 
-    // Salva no backend
     if (isLoggedIn()) {
-      fetch(`${API_BASE_URL}/bible/highlights`, {
-        method: 'POST',
-        headers: authHeaders(),
-        body: JSON.stringify({ translation, bookIndex, bookName: book.name, chapter, verse: v.verse, text: v.text, color: colorId }),
-      })
-        .then(r => r.ok ? r.json() : null)
-        .then(data => {
-          if (data?.id) {
-            setHighlights(prev => {
-              const next = prev.map(h => h.id === id ? { ...h, serverId: data.id } : h);
-              saveHighlights(next);
-              return next;
-            });
-          }
-        })
-        .catch(() => {});
+      try {
+        const res = await fetch(`${API_BASE_URL}/bible/highlights`, {
+          method: 'POST',
+          headers: authHeaders(),
+          body: JSON.stringify({ translation, bookIndex, bookName: book.name, chapter, verse: v.verse, text: v.text, color: colorId }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.id) newHighlight.serverId = data.id;
+        }
+      } catch {}
     }
 
     setHighlights(prev => {
       const next = [...prev.filter(h => h.id !== id), newHighlight];
-      saveHighlights(next);
+      if (!isLoggedIn()) saveHighlights(next);
       return next;
     });
   };
 
-  const removeHighlight = (id: string) => {
+  const removeHighlight = async (id: string) => {
     const hl = highlights.find(h => h.id === id);
     if (hl && isLoggedIn()) {
       const params = new URLSearchParams({
@@ -339,20 +326,36 @@ export function Biblia() {
         chapter:     String(hl.chapter),
         verse:       String(hl.verse),
       });
-      fetch(`${API_BASE_URL}/bible/highlights?${params}`, {
-        method: 'DELETE', headers: authHeaders(),
-      }).catch(() => {});
+      try {
+        const res = await fetch(`${API_BASE_URL}/bible/highlights?${params}`, {
+          method: 'DELETE', headers: authHeaders(),
+        });
+        if (!res.ok) {
+          toast.error(`Erro ${res.status} ao remover marcação.`);
+          return;
+        }
+        const body = await res.json().catch(() => ({}));
+        if (body.deleted === 0) {
+          console.warn('[DELETE highlights] deleted=0', body);
+          toast.warning('deleted=0 — veja o console do browser para diagnóstico');
+          return;
+        }
+      } catch {
+        toast.error('Erro ao remover marcação. Verifique sua conexão.');
+        return;
+      }
     }
     setHighlights(prev => {
       const next = prev.filter(h => h.id !== id);
-      saveHighlights(next);
+      if (!isLoggedIn()) saveHighlights(next);
       return next;
     });
+    toast.success('Marcação removida.');
   };
 
   const clearAllHighlights = () => {
     setHighlights([]);
-    saveHighlights([]);
+    if (!isLoggedIn()) saveHighlights([]);
     toast.success('Marcações removidas.');
   };
 
@@ -371,11 +374,13 @@ export function Biblia() {
     setSelectedVerses(new Set());
   };
 
-  const removeSelectedHighlights = () => {
-    selectedVerses.forEach(verseNum => {
-      const id = `${translation}-${bookIndex}-${chapter}-${verseNum}`;
-      removeHighlight(id);
-    });
+  const removeSelectedHighlights = async () => {
+    await Promise.all(
+      [...selectedVerses].map(verseNum => {
+        const id = `${translation}-${bookIndex}-${chapter}-${verseNum}`;
+        return removeHighlight(id);
+      })
+    );
     setSelectedVerses(new Set());
   };
 

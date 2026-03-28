@@ -10,8 +10,10 @@ import com.nivah.service.BibleSeedService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -26,6 +28,7 @@ public class BibleController {
     private final BibleHighlightRepository bibleHighlightRepository;
     private final BibleSeedService bibleSeedService;
     private final UserRepository userRepository;
+    private final JdbcTemplate jdbc;
 
     private static final Set<String> VALID =
         Set.of("arc", "nvi", "ara", "acf", "aa", "kja", "ntlh", "naa");
@@ -122,18 +125,25 @@ public class BibleController {
             @RequestBody Map<String, Object> body) {
 
         User user = findUser(userDetails);
+        String translation = str(body, "translation").toLowerCase();
+        int bookIndex = num(body, "bookIndex");
+        int chapter   = num(body, "chapter");
+        int verse     = num(body, "verse");
 
-        BibleHighlight highlight = BibleHighlight.builder()
-                .userId(user.getId())
-                .translation(str(body, "translation"))
-                .bookIndex(num(body, "bookIndex"))
-                .bookName(str(body, "bookName"))
-                .chapter(num(body, "chapter"))
-                .verse(num(body, "verse"))
-                .text(str(body, "text"))
-                .color(str(body, "color"))
-                .build();
+        BibleHighlight highlight = bibleHighlightRepository
+                .findByUserIdAndTranslationAndBookIndexAndChapterAndVerse(
+                        user.getId(), translation, bookIndex, chapter, verse)
+                .orElseGet(() -> BibleHighlight.builder()
+                        .userId(user.getId())
+                        .translation(translation)
+                        .bookIndex(bookIndex)
+                        .bookName(str(body, "bookName"))
+                        .chapter(chapter)
+                        .verse(verse)
+                        .text(str(body, "text"))
+                        .build());
 
+        highlight.setColor(str(body, "color"));
         BibleHighlight saved = bibleHighlightRepository.save(highlight);
         return ResponseEntity.ok(Map.of("id", saved.getId().toString()));
     }
@@ -144,7 +154,9 @@ public class BibleController {
             @PathVariable UUID id) {
 
         User user = findUser(userDetails);
-        bibleHighlightRepository.deleteByIdAndUserId(id, user.getId());
+        jdbc.update(
+            "DELETE FROM bible_highlight WHERE id = ? AND user_id = ?",
+            id, user.getId());
         return ResponseEntity.noContent().build();
     }
 
@@ -157,9 +169,17 @@ public class BibleController {
             @RequestParam int verse) {
 
         User user = findUser(userDetails);
-        bibleHighlightRepository.deleteByUserIdAndTranslationAndBookIndexAndChapterAndVerse(
-            user.getId(), translation.toLowerCase(), bookIndex, chapter, verse);
-        return ResponseEntity.noContent().build();
+        List<Map<String, Object>> existing = jdbc.queryForList(
+            "SELECT id, user_id, translation, book_index, chapter, verse FROM bible_highlight WHERE user_id = ?::uuid",
+            user.getId().toString());
+        int deleted = jdbc.update(
+            "DELETE FROM bible_highlight WHERE user_id = ?::uuid AND LOWER(translation) = LOWER(?) AND book_index = ? AND chapter = ? AND verse = ?",
+            user.getId().toString(), translation, bookIndex, chapter, verse);
+        return ResponseEntity.ok(Map.of(
+            "deleted", deleted,
+            "sentParams", Map.of("userId", user.getId().toString(), "translation", translation.toLowerCase(), "bookIndex", bookIndex, "chapter", chapter, "verse", verse),
+            "rowsInDb", existing
+        ));
     }
 
     // -------------------------------------------------------------------------
