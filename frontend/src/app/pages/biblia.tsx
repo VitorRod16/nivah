@@ -646,50 +646,72 @@ export function Biblia() {
                 return (
                   <div
                     key={v.verse}
-                    onClick={() => toggleVerseSelection(v.verse)}
-                    className={`group relative flex items-start gap-3 py-2.5 px-3 rounded-lg transition-colors cursor-pointer select-none ${
-                      selected
-                        ? 'ring-2 ring-primary/40 bg-primary/5'
-                        : 'hover:bg-muted/30'
+                    className={`rounded-lg transition-colors overflow-hidden ${
+                      selected ? 'ring-2 ring-primary/40' : ''
                     }`}
                     style={!selected && hlColor ? { backgroundColor: hlColor.bg } : undefined}
                   >
-                    {/* Indicador de seleção / número do versículo */}
-                    <div className="w-6 shrink-0 flex justify-end mt-0.5">
-                      {selected ? (
-                        <div className="w-4 h-4 rounded-full bg-primary flex items-center justify-center">
-                          <Check className="w-2.5 h-2.5 text-primary-foreground" />
-                        </div>
-                      ) : (
-                        <span className="text-xs font-bold text-primary/60">
-                          {v.verse}
-                        </span>
+                    {/* Linha do versículo */}
+                    <div
+                      onClick={() => toggleVerseSelection(v.verse)}
+                      className={`group flex items-start gap-3 py-2.5 px-3 cursor-pointer select-none transition-colors ${
+                        selected ? 'bg-primary/5' : 'hover:bg-muted/30'
+                      }`}
+                    >
+                      <div className="w-6 shrink-0 flex justify-end mt-0.5">
+                        {selected ? (
+                          <div className="w-4 h-4 rounded-full bg-primary flex items-center justify-center">
+                            <Check className="w-2.5 h-2.5 text-primary-foreground" />
+                          </div>
+                        ) : (
+                          <span className="text-xs font-bold text-primary/60">{v.verse}</span>
+                        )}
+                      </div>
+                      <p className="text-foreground leading-relaxed flex-1 text-[15px]">{v.text}</p>
+                      {hl && !selected && (
+                        <Bookmark className="w-3.5 h-3.5 shrink-0 mt-0.5" style={{ fill: hlColor!.swatch, color: hlColor!.swatch }} />
                       )}
+                      <button
+                        onClick={e => { e.stopPropagation(); copyVerse(v); }}
+                        className="shrink-0 p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors mt-0.5"
+                        title="Copiar versículo"
+                      >
+                        {copiedVerse === v.verse ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
                     </div>
 
-                    <p className="text-foreground leading-relaxed flex-1 text-[15px]">
-                      {v.text}
-                    </p>
-
-                    {/* Bookmark indicator (não clicável, só visual) */}
-                    {hl && !selected && (
-                      <Bookmark
-                        className="w-3.5 h-3.5 shrink-0 mt-0.5"
-                        style={{ fill: hlColor!.swatch, color: hlColor!.swatch }}
-                      />
+                    {/* Barra de cores inline — aparece quando o versículo está selecionado */}
+                    {selected && (
+                      <div className="flex items-center gap-2 px-3 py-2 bg-primary/5 border-t border-primary/10">
+                        <span className="text-xs text-muted-foreground mr-1">Marcar:</span>
+                        {HIGHLIGHT_COLORS.map(c => (
+                          <button
+                            key={c.id}
+                            onClick={e => { e.stopPropagation(); applyColorToSelected(c.id); }}
+                            title={c.label}
+                            className="w-6 h-6 rounded-full border-2 transition-transform hover:scale-125 focus:outline-none"
+                            style={{
+                              backgroundColor: c.swatch,
+                              borderColor: hl?.color === c.id ? 'rgba(0,0,0,0.4)' : 'transparent',
+                            }}
+                          />
+                        ))}
+                        {hl && (
+                          <button
+                            onClick={e => { e.stopPropagation(); removeHighlight(hl.id); setSelectedVerses(new Set()); }}
+                            className="ml-auto flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" /> Remover
+                          </button>
+                        )}
+                        <button
+                          onClick={e => { e.stopPropagation(); toggleVerseSelection(v.verse); }}
+                          className="p-0.5 rounded text-muted-foreground hover:text-foreground transition-colors ml-auto"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     )}
-
-                    {/* Botão copiar (aparece no hover, não interfere na seleção) */}
-                    <button
-                      onClick={e => { e.stopPropagation(); copyVerse(v); }}
-                      className="shrink-0 p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-all opacity-0 group-hover:opacity-100 mt-0.5"
-                      title="Copiar versículo"
-                    >
-                      {copiedVerse === v.verse
-                        ? <Check className="w-3.5 h-3.5 text-green-500" />
-                        : <Copy className="w-3.5 h-3.5" />
-                      }
-                    </button>
                   </div>
                 );
               })}
