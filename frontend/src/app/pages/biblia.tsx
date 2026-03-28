@@ -163,7 +163,12 @@ export function Biblia() {
   const [highlights, setHighlights] = useState<Highlight[]>(loadHighlights);
   const [showHighlights, setShowHighlights] = useState(false);
   const [selectedVerses, setSelectedVerses] = useState<Set<number>>(new Set());
+  const [isTouch, setIsTouch] = useState(false);
   const topRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setIsTouch(window.matchMedia('(hover: none) and (pointer: coarse)').matches);
+  }, []);
 
   // Sincroniza destaques do backend na montagem
   useEffect(() => {
@@ -646,18 +651,13 @@ export function Biblia() {
                 return (
                   <div
                     key={v.verse}
-                    className={`rounded-lg transition-colors overflow-hidden ${
-                      selected ? 'ring-2 ring-primary/40' : ''
-                    }`}
+                    className={`group rounded-lg overflow-hidden transition-colors ${selected ? 'ring-2 ring-primary/40' : ''}`}
                     style={!selected && hlColor ? { backgroundColor: hlColor.bg } : undefined}
+                    // Mobile: toca no versículo para selecionar
+                    onClick={isTouch ? () => toggleVerseSelection(v.verse) : undefined}
                   >
-                    {/* Linha do versículo */}
-                    <div
-                      onClick={() => toggleVerseSelection(v.verse)}
-                      className={`group flex items-start gap-3 py-2.5 px-3 cursor-pointer select-none transition-colors ${
-                        selected ? 'bg-primary/5' : 'hover:bg-muted/30'
-                      }`}
-                    >
+                    <div className={`flex items-start gap-3 py-2.5 px-3 transition-colors ${selected ? 'bg-primary/5' : 'hover:bg-muted/30'}`}>
+                      {/* Número / indicador de seleção */}
                       <div className="w-6 shrink-0 flex justify-end mt-0.5">
                         {selected ? (
                           <div className="w-4 h-4 rounded-full bg-primary flex items-center justify-center">
@@ -667,46 +667,63 @@ export function Biblia() {
                           <span className="text-xs font-bold text-primary/60">{v.verse}</span>
                         )}
                       </div>
+
+                      {/* Texto */}
                       <p className="text-foreground leading-relaxed flex-1 text-[15px]">{v.text}</p>
-                      {hl && !selected && (
-                        <Bookmark className="w-3.5 h-3.5 shrink-0 mt-0.5" style={{ fill: hlColor!.swatch, color: hlColor!.swatch }} />
-                      )}
-                      <button
-                        onClick={e => { e.stopPropagation(); copyVerse(v); }}
-                        className="shrink-0 p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors mt-0.5"
-                        title="Copiar versículo"
-                      >
-                        {copiedVerse === v.verse ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
-                      </button>
+
+                      {/* Ações — hover no mouse, visíveis no toque quando selecionado */}
+                      <div className={`shrink-0 flex items-center gap-0.5 transition-opacity ${
+                        isTouch
+                          ? (selected ? 'opacity-100' : 'opacity-0 pointer-events-none')
+                          : 'opacity-0 group-hover:opacity-100'
+                      }`}>
+                        {/* Desktop: bookmark abre o seletor de cor */}
+                        {!isTouch && (
+                          <button
+                            onClick={e => { e.stopPropagation(); toggleVerseSelection(v.verse); }}
+                            className="p-1 rounded transition-colors text-muted-foreground hover:bg-accent"
+                            title={hl ? 'Alterar marcação' : 'Marcar versículo'}
+                          >
+                            <Bookmark
+                              className="w-3.5 h-3.5"
+                              style={hlColor ? { fill: hlColor.swatch, color: hlColor.swatch } : undefined}
+                            />
+                          </button>
+                        )}
+                        <button
+                          onClick={e => { e.stopPropagation(); copyVerse(v); }}
+                          className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                          title="Copiar versículo"
+                        >
+                          {copiedVerse === v.verse ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
                     </div>
 
-                    {/* Barra de cores inline — aparece quando o versículo está selecionado */}
+                    {/* Seletor de cor inline — aparece quando selecionado (ambos dispositivos) */}
                     {selected && (
                       <div className="flex items-center gap-2 px-3 py-2 bg-primary/5 border-t border-primary/10">
-                        <span className="text-xs text-muted-foreground mr-1">Marcar:</span>
+                        <span className="text-xs text-muted-foreground shrink-0">Marcar:</span>
                         {HIGHLIGHT_COLORS.map(c => (
                           <button
                             key={c.id}
                             onClick={e => { e.stopPropagation(); applyColorToSelected(c.id); }}
                             title={c.label}
-                            className="w-6 h-6 rounded-full border-2 transition-transform hover:scale-125 focus:outline-none"
-                            style={{
-                              backgroundColor: c.swatch,
-                              borderColor: hl?.color === c.id ? 'rgba(0,0,0,0.4)' : 'transparent',
-                            }}
+                            className="w-6 h-6 rounded-full border-2 transition-transform hover:scale-125 active:scale-110 focus:outline-none"
+                            style={{ backgroundColor: c.swatch, borderColor: hl?.color === c.id ? 'rgba(0,0,0,0.4)' : 'transparent' }}
                           />
                         ))}
                         {hl && (
                           <button
                             onClick={e => { e.stopPropagation(); removeHighlight(hl.id); setSelectedVerses(new Set()); }}
-                            className="ml-auto flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors"
+                            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors"
                           >
-                            <Trash2 className="w-3.5 h-3.5" /> Remover
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         )}
                         <button
                           onClick={e => { e.stopPropagation(); toggleVerseSelection(v.verse); }}
-                          className="p-0.5 rounded text-muted-foreground hover:text-foreground transition-colors ml-auto"
+                          className="ml-auto p-0.5 rounded text-muted-foreground hover:text-foreground transition-colors"
                         >
                           <X className="w-3.5 h-3.5" />
                         </button>
