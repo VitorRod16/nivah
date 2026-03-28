@@ -62,19 +62,33 @@ export function Home() {
 
       {/* Palavra do dia */}
       {palavraDoDia && (
-        <Card className="p-5 bg-primary/5 border-primary/20">
-          <div className="flex items-center gap-2 mb-3">
-            <BookOpen className="w-4 h-4 text-primary" />
-            <span className="text-xs font-semibold text-primary uppercase tracking-wider">Palavra do dia</span>
+        <div className="relative overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-6">
+          {/* Aspas decorativas */}
+          <span className="absolute top-3 right-5 text-8xl font-serif leading-none text-primary/10 select-none pointer-events-none">
+            "
+          </span>
+
+          <div className="flex items-center gap-2 mb-4">
+            <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/15">
+              <BookOpen className="w-4 h-4 text-primary" />
+            </div>
+            <span className="text-xs font-semibold text-primary uppercase tracking-widest">
+              Palavra do dia
+            </span>
           </div>
-          <p className="text-foreground leading-relaxed italic text-[15px]">
-            "{palavraDoDia.text}"
+
+          <p className="text-foreground leading-relaxed text-base sm:text-lg font-medium relative z-10 max-w-2xl">
+            {palavraDoDia.text}
           </p>
-          <p className="mt-2 text-sm font-medium text-muted-foreground">
-            {BOOK_NAMES[palavraDoDia.book - 1]} {palavraDoDia.chapter}:{palavraDoDia.verse}
-            <span className="ml-1 text-xs">({palavraDoDia.translation})</span>
-          </p>
-        </Card>
+
+          <div className="mt-4 flex items-center gap-2">
+            <div className="h-px flex-1 bg-primary/20 max-w-[40px]" />
+            <p className="text-sm font-semibold text-primary">
+              {BOOK_NAMES[palavraDoDia.book - 1]} {palavraDoDia.chapter}:{palavraDoDia.verse}
+            </p>
+            <span className="text-xs text-muted-foreground">· {palavraDoDia.translation}</span>
+          </div>
+        </div>
       )}
 
       {/* Stats */}
