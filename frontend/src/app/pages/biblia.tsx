@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight, BookOpen, Search, Copy, Check, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, BookOpen, Search, Copy, Check, Loader2, Bookmark, X, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 const API_BASE = (import.meta.env.VITE_API_URL ?? 'http://localhost:8080') + '/api';
@@ -9,7 +9,6 @@ type Verse = {
   text: string;
 };
 
-// bolls.life retorna um array de versículos
 type BollsVerse = { pk: number; verse: number; text: string };
 
 type Book = {
@@ -18,8 +17,56 @@ type Book = {
   testament: 'AT' | 'NT';
 };
 
+type HighlightColor = {
+  id: string;
+  label: string;
+  bg: string;      // rgba para fundo do versículo
+  swatch: string;  // hex para o swatch e ícone
+};
+
+const HIGHLIGHT_COLORS: HighlightColor[] = [
+  { id: 'yellow', label: 'Amarelo', bg: 'rgba(253, 224, 71, 0.35)',  swatch: '#FBBF24' },
+  { id: 'green',  label: 'Verde',   bg: 'rgba(134, 239, 172, 0.35)', swatch: '#34D399' },
+  { id: 'blue',   label: 'Azul',    bg: 'rgba(147, 197, 253, 0.35)', swatch: '#60A5FA' },
+  { id: 'rose',   label: 'Rosa',    bg: 'rgba(253, 164, 175, 0.35)', swatch: '#FB7185' },
+  { id: 'purple', label: 'Roxo',    bg: 'rgba(196, 181, 253, 0.35)', swatch: '#A78BFA' },
+];
+
+type Highlight = {
+  id: string;       // local key: `${translation}-${bookIndex}-${chapter}-${verse}`
+  serverId?: string; // UUID retornado pelo backend
+  translation: string;
+  bookIndex: number;
+  bookName: string;
+  chapter: number;
+  verse: number;
+  text: string;
+  color: string;
+};
+
+const API_BASE_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:8080') + '/api';
+const HIGHLIGHTS_KEY = 'bible_highlights';
+
+function loadHighlights(): Highlight[] {
+  try { return JSON.parse(localStorage.getItem(HIGHLIGHTS_KEY) ?? '[]'); }
+  catch { return []; }
+}
+
+function saveHighlights(highlights: Highlight[]) {
+  localStorage.setItem(HIGHLIGHTS_KEY, JSON.stringify(highlights));
+}
+
+function authHeaders(): HeadersInit {
+  const token = localStorage.getItem('token');
+  return token ? { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } : {};
+}
+
+function isLoggedIn() {
+  return !!localStorage.getItem('token');
+}
+
 const BOOKS: Book[] = [
-  // Antigo Testamento (índice 0–38 = livros 1–39)
+  // Antigo Testamento
   { name: 'Gênesis', chapters: 50, testament: 'AT' },
   { name: 'Êxodo', chapters: 40, testament: 'AT' },
   { name: 'Levítico', chapters: 27, testament: 'AT' },
@@ -59,7 +106,7 @@ const BOOKS: Book[] = [
   { name: 'Ageu', chapters: 2, testament: 'AT' },
   { name: 'Zacarias', chapters: 14, testament: 'AT' },
   { name: 'Malaquias', chapters: 4, testament: 'AT' },
-  // Novo Testamento (índice 39–65 = livros 40–66)
+  // Novo Testamento
   { name: 'Mateus', chapters: 28, testament: 'NT' },
   { name: 'Marcos', chapters: 16, testament: 'NT' },
   { name: 'Lucas', chapters: 24, testament: 'NT' },
@@ -93,14 +140,14 @@ const AT_BOOKS = BOOKS.filter(b => b.testament === 'AT');
 const NT_BOOKS = BOOKS.filter(b => b.testament === 'NT');
 
 const TRANSLATIONS = [
-  { id: 'ARC',  label: 'ARC — Almeida Revista e Corrigida'      },
-  { id: 'NVI',  label: 'NVI — Nova Versão Internacional'         },
-  { id: 'ACF',  label: 'ACF — Almeida Corrigida Fiel'           },
-  { id: 'AA',   label: 'AA — Almeida Antiga'                     },
-  { id: 'KJA',  label: 'KJA — King James Atualizada'            },
-  { id: 'ARA',  label: 'ARA — Almeida Revista e Atualizada'     },
+  { id: 'ARC',  label: 'ARC — Almeida Revista e Corrigida'         },
+  { id: 'NVI',  label: 'NVI — Nova Versão Internacional'            },
+  { id: 'ACF',  label: 'ACF — Almeida Corrigida Fiel'              },
+  { id: 'AA',   label: 'AA — Almeida Antiga'                        },
+  { id: 'KJA',  label: 'KJA — King James Atualizada'               },
+  { id: 'ARA',  label: 'ARA — Almeida Revista e Atualizada'        },
   { id: 'NTLH', label: 'NTLH — Nova Tradução na Linguagem de Hoje' },
-  { id: 'NAA',  label: 'NAA — Nova Almeida Atualizada'          },
+  { id: 'NAA',  label: 'NAA — Nova Almeida Atualizada'             },
 ];
 
 export function Biblia() {
@@ -113,7 +160,27 @@ export function Biblia() {
   const [copiedVerse, setCopiedVerse] = useState<number | null>(null);
   const [searchRef, setSearchRef] = useState('');
   const [showBooks, setShowBooks] = useState(false);
+  const [highlights, setHighlights] = useState<Highlight[]>(loadHighlights);
+  const [showHighlights, setShowHighlights] = useState(false);
+  const [colorPickerVerse, setColorPickerVerse] = useState<number | null>(null);
   const topRef = useRef<HTMLDivElement>(null);
+
+  // Sincroniza destaques do backend na montagem
+  useEffect(() => {
+    if (!isLoggedIn()) return;
+    fetch(`${API_BASE_URL}/bible/highlights`, { headers: authHeaders() })
+      .then(r => r.ok ? r.json() : [])
+      .then((data: Array<Highlight & { id: string }>) => {
+        const remote: Highlight[] = data.map(h => ({
+          ...h,
+          id: `${h.translation}-${h.bookIndex}-${h.chapter}-${h.verse}`,
+          serverId: h.id,
+        }));
+        setHighlights(remote);
+        saveHighlights(remote);
+      })
+      .catch(() => {});
+  }, []);
 
   const book = BOOKS[bookIndex];
 
@@ -122,7 +189,6 @@ export function Biblia() {
     setError(null);
     setVerses([]);
     try {
-      // getbible.net uses 1-based book numbers matching standard Bible order
       const bookNumber = bi + 1;
       const token = localStorage.getItem('token');
       const res = await fetch(
@@ -151,6 +217,7 @@ export function Biblia() {
     setBookIndex(bi);
     setChapter(ch);
     setShowBooks(false);
+    setShowHighlights(false);
   };
 
   const prevChapter = () => {
@@ -175,11 +242,10 @@ export function Biblia() {
     const input = searchRef.trim().toLowerCase();
     if (!input) return;
 
-    // Try to parse "Book Chapter" or "Book Chapter:Verse"
-    // Match patterns like "João 3", "João 3:16", "1 coríntios 13"
-    const match = input.match(/^(.+?)\s+(\d+)(?::(\d+))?$/);
+    // Suporta: "João 3", "João 3:16", "João 3 16"
+    const match = input.match(/^(.+?)\s+(\d+)(?:[:\s](\d+))?$/);
     if (!match) {
-      toast.error('Formato inválido. Use: "Livro Capítulo" ou "Livro Capítulo:Versículo"');
+      toast.error('Use: "João 3", "João 3:16" ou "João 3 16"');
       return;
     }
 
@@ -190,29 +256,94 @@ export function Biblia() {
       b.name.toLowerCase().includes(bookName) ||
       bookName.includes(b.name.toLowerCase().substring(0, 4))
     );
-
     if (found === -1) {
       toast.error(`Livro "${match[1]}" não encontrado.`);
       return;
     }
-
     const targetBook = BOOKS[found];
     if (ch < 1 || ch > targetBook.chapters) {
       toast.error(`${targetBook.name} tem apenas ${targetBook.chapters} capítulo(s).`);
       return;
     }
-
     goTo(found, ch);
     setSearchRef('');
   };
 
   const copyVerse = (v: Verse) => {
-    const abbr = translation.toUpperCase();
-    const text = `"${v.text}" — ${book.name} ${chapter}:${v.verse} (${abbr})`;
+    const text = `"${v.text}" — ${book.name} ${chapter}:${v.verse} (${translation.toUpperCase()})`;
     navigator.clipboard.writeText(text).then(() => {
       setCopiedVerse(v.verse);
       setTimeout(() => setCopiedVerse(null), 2000);
     });
+  };
+
+  const highlightId = (v: Verse) => `${translation}-${bookIndex}-${chapter}-${v.verse}`;
+
+  const getHighlight = (v: Verse) => highlights.find(h => h.id === highlightId(v));
+
+  const markVerse = async (v: Verse, colorId: string) => {
+    const id = highlightId(v);
+    const existing = getHighlight(v);
+
+    // Remove versão antiga no backend se existir
+    if (existing?.serverId && isLoggedIn()) {
+      fetch(`${API_BASE_URL}/bible/highlights/${existing.serverId}`, {
+        method: 'DELETE', headers: authHeaders(),
+      }).catch(() => {});
+    }
+
+    const newHighlight: Highlight = {
+      id, translation, bookIndex, bookName: book.name,
+      chapter, verse: v.verse, text: v.text, color: colorId,
+    };
+
+    // Salva no backend
+    if (isLoggedIn()) {
+      fetch(`${API_BASE_URL}/bible/highlights`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ translation, bookIndex, bookName: book.name, chapter, verse: v.verse, text: v.text, color: colorId }),
+      })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (data?.id) {
+            setHighlights(prev => {
+              const next = prev.map(h => h.id === id ? { ...h, serverId: data.id } : h);
+              saveHighlights(next);
+              return next;
+            });
+          }
+        })
+        .catch(() => {});
+    }
+
+    setHighlights(prev => {
+      const next = [...prev.filter(h => h.id !== id), newHighlight];
+      saveHighlights(next);
+      return next;
+    });
+    setColorPickerVerse(null);
+  };
+
+  const removeHighlight = (id: string) => {
+    const hl = highlights.find(h => h.id === id);
+    if (hl?.serverId && isLoggedIn()) {
+      fetch(`${API_BASE_URL}/bible/highlights/${hl.serverId}`, {
+        method: 'DELETE', headers: authHeaders(),
+      }).catch(() => {});
+    }
+    setHighlights(prev => {
+      const next = prev.filter(h => h.id !== id);
+      saveHighlights(next);
+      return next;
+    });
+    setColorPickerVerse(null);
+  };
+
+  const clearAllHighlights = () => {
+    setHighlights([]);
+    saveHighlights([]);
+    toast.success('Marcações removidas.');
   };
 
   const isFirst = bookIndex === 0 && chapter === 1;
@@ -231,14 +362,14 @@ export function Biblia() {
 
         {/* Search */}
         <form onSubmit={handleSearch} className="flex gap-2 w-full sm:w-auto">
-          <div className="relative flex-1 sm:w-56">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+          <div className="flex items-center gap-2 flex-1 sm:w-64 px-3 py-2 rounded-md border border-border bg-input focus-within:ring-2 focus-within:ring-ring">
+            <Search className="w-4 h-4 text-muted-foreground shrink-0" />
             <input
               type="text"
               value={searchRef}
               onChange={e => setSearchRef(e.target.value)}
-              placeholder="Ex: João 3 ou Salmos 23"
-              className="w-full pl-9 pr-3 py-2 rounded-md border border-border bg-input text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              placeholder="João 3 · João 3:16 · João 1 3"
+              className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none min-w-0"
             />
           </div>
           <button
@@ -266,7 +397,7 @@ export function Biblia() {
 
         {/* Book selector */}
         <button
-          onClick={() => setShowBooks(v => !v)}
+          onClick={() => { setShowBooks(v => !v); setShowHighlights(false); }}
           className="flex items-center gap-2 px-4 py-2 rounded-md border border-border bg-card text-sm font-medium text-foreground hover:bg-accent transition-colors"
         >
           <BookOpen className="w-4 h-4 text-primary" />
@@ -283,6 +414,22 @@ export function Biblia() {
             <option key={ch} value={ch}>Capítulo {ch}</option>
           ))}
         </select>
+
+        {/* Highlights button */}
+        <button
+          onClick={() => { setShowHighlights(v => !v); setShowBooks(false); }}
+          className={`flex items-center gap-2 px-3 py-2 rounded-md border text-sm font-medium transition-colors ${
+            showHighlights
+              ? 'bg-amber-100 border-amber-300 text-amber-800 dark:bg-amber-900/30 dark:border-amber-700 dark:text-amber-300'
+              : 'border-border bg-card text-foreground hover:bg-accent'
+          }`}
+          title="Versículos marcados"
+        >
+          <Bookmark className="w-4 h-4" />
+          {highlights.length > 0 && (
+            <span className="text-xs font-semibold">{highlights.length}</span>
+          )}
+        </button>
 
         {/* Prev / Next */}
         <div className="flex gap-1 ml-auto">
@@ -318,7 +465,7 @@ export function Biblia() {
                 const active = idx === bookIndex;
                 return (
                   <button
-                    key={b.slug}
+                    key={b.name}
                     onClick={() => goTo(idx, 1)}
                     className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
                       active
@@ -342,7 +489,7 @@ export function Biblia() {
                 const active = idx === bookIndex;
                 return (
                   <button
-                    key={b.slug}
+                    key={b.name}
                     onClick={() => goTo(idx, 1)}
                     className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
                       active
@@ -356,6 +503,79 @@ export function Biblia() {
               })}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Highlights panel */}
+      {showHighlights && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-950/20 overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-amber-200 dark:border-amber-800">
+            <div className="flex items-center gap-2">
+              <Bookmark className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+              <span className="text-sm font-semibold text-amber-900 dark:text-amber-300">
+                Versículos marcados
+              </span>
+              <span className="text-xs text-amber-600 dark:text-amber-500">
+                ({highlights.length})
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              {highlights.length > 0 && (
+                <button
+                  onClick={clearAllHighlights}
+                  className="flex items-center gap-1 px-2 py-1 rounded text-xs text-amber-700 hover:bg-amber-100 dark:text-amber-400 dark:hover:bg-amber-900/40 transition-colors"
+                  title="Remover todas as marcações"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Limpar tudo
+                </button>
+              )}
+              <button
+                onClick={() => setShowHighlights(false)}
+                className="p-1 rounded text-amber-600 hover:bg-amber-100 dark:text-amber-400 dark:hover:bg-amber-900/40 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {highlights.length === 0 ? (
+            <div className="px-4 py-10 text-center text-sm text-amber-700/60 dark:text-amber-500/60">
+              Nenhum versículo marcado ainda. Clique no{' '}
+              <Bookmark className="w-3.5 h-3.5 inline" /> ao lado de um versículo para marcar.
+            </div>
+          ) : (
+            <div className="divide-y divide-amber-200/60 dark:divide-amber-800/60 max-h-96 overflow-y-auto">
+              {highlights.map(h => {
+                const hlColor = HIGHLIGHT_COLORS.find(c => c.id === h.color) ?? HIGHLIGHT_COLORS[0];
+                return (
+                  <div
+                    key={h.id}
+                    className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-muted/20"
+                    style={{ borderLeft: `3px solid ${hlColor.swatch}` }}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <button
+                        onClick={() => goTo(h.bookIndex, h.chapter)}
+                        className="text-xs font-semibold hover:underline mb-1 block"
+                        style={{ color: hlColor.swatch }}
+                      >
+                        {h.bookName} {h.chapter}:{h.verse} · {h.translation.toUpperCase()}
+                      </button>
+                      <p className="text-sm text-foreground leading-relaxed line-clamp-2">{h.text}</p>
+                    </div>
+                    <button
+                      onClick={() => removeHighlight(h.id)}
+                      className="shrink-0 p-1 rounded text-muted-foreground hover:text-destructive hover:bg-accent transition-colors mt-0.5"
+                      title="Remover marcação"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -395,29 +615,80 @@ export function Biblia() {
 
           {!loading && !error && verses.length > 0 && (
             <div className="space-y-1">
-              {verses.map(v => (
-                <div
-                  key={v.verse}
-                  className="group flex items-start gap-3 py-2 px-3 rounded-lg hover:bg-muted/30 transition-colors"
-                >
-                  <span className="text-xs font-bold text-primary/60 mt-0.5 w-6 shrink-0 text-right select-none">
-                    {v.verse}
-                  </span>
-                  <p className="text-foreground leading-relaxed flex-1 text-[15px]">
-                    {v.text}
-                  </p>
-                  <button
-                    onClick={() => copyVerse(v)}
-                    className="shrink-0 p-1 rounded opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground hover:bg-accent transition-all"
-                    title="Copiar versículo"
+              {verses.map(v => {
+                const hl = getHighlight(v);
+                const hlColor = hl ? HIGHLIGHT_COLORS.find(c => c.id === hl.color) ?? HIGHLIGHT_COLORS[0] : null;
+                const pickerOpen = colorPickerVerse === v.verse;
+                return (
+                  <div
+                    key={v.verse}
+                    className="group relative flex items-start gap-3 py-2 px-3 rounded-lg transition-colors hover:bg-muted/30"
+                    style={hlColor ? { backgroundColor: hlColor.bg } : undefined}
                   >
-                    {copiedVerse === v.verse
-                      ? <Check className="w-3.5 h-3.5 text-green-500" />
-                      : <Copy className="w-3.5 h-3.5" />
-                    }
-                  </button>
-                </div>
-              ))}
+                    <span className="text-xs font-bold text-primary/60 mt-0.5 w-6 shrink-0 text-right select-none">
+                      {v.verse}
+                    </span>
+                    <p className="text-foreground leading-relaxed flex-1 text-[15px]">
+                      {v.text}
+                    </p>
+                    <div className={`shrink-0 flex items-center gap-0.5 transition-opacity ${hl || pickerOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                      <button
+                        onClick={() => setColorPickerVerse(pickerOpen ? null : v.verse)}
+                        className="p-1 rounded transition-colors text-muted-foreground hover:bg-accent"
+                        title={hl ? 'Alterar marcação' : 'Marcar versículo'}
+                      >
+                        <Bookmark
+                          className="w-3.5 h-3.5"
+                          style={hlColor ? { fill: hlColor.swatch, color: hlColor.swatch } : undefined}
+                        />
+                      </button>
+                      <button
+                        onClick={() => copyVerse(v)}
+                        className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                        title="Copiar versículo"
+                      >
+                        {copiedVerse === v.verse
+                          ? <Check className="w-3.5 h-3.5 text-green-500" />
+                          : <Copy className="w-3.5 h-3.5" />
+                        }
+                      </button>
+                    </div>
+
+                    {/* Color picker popover */}
+                    {pickerOpen && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-10"
+                          onClick={() => setColorPickerVerse(null)}
+                        />
+                        <div className="absolute right-0 top-8 z-20 flex items-center gap-1.5 px-2.5 py-2 rounded-lg border border-border bg-popover shadow-md">
+                          {HIGHLIGHT_COLORS.map(c => (
+                            <button
+                              key={c.id}
+                              onClick={() => markVerse(v, c.id)}
+                              title={c.label}
+                              className="w-6 h-6 rounded-full border-2 transition-transform hover:scale-110 focus:outline-none"
+                              style={{
+                                backgroundColor: c.swatch,
+                                borderColor: hl?.color === c.id ? '#000' : 'transparent',
+                              }}
+                            />
+                          ))}
+                          {hl && (
+                            <button
+                              onClick={() => removeHighlight(hl.id)}
+                              className="ml-1 p-1 rounded text-muted-foreground hover:text-destructive hover:bg-accent transition-colors"
+                              title="Remover marcação"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

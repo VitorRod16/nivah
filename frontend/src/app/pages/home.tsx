@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Calendar, Crown, BookOpen, Music, Users, Church, Clock } from 'lucide-react';
 import { Card } from '../components/ui/card';
 import { useMockData } from '../context/MockDataContext';
@@ -5,11 +6,35 @@ import { useAuth } from '../context/AuthContext';
 import { useActiveChurch } from '../context/ChurchContext';
 import { useNavigate } from 'react-router';
 
+const API_BASE = (import.meta.env.VITE_API_URL ?? 'http://localhost:8080') + '/api';
+
+const BOOK_NAMES = [
+  'Gênesis','Êxodo','Levítico','Números','Deuteronômio','Josué','Juízes','Rute',
+  '1 Samuel','2 Samuel','1 Reis','2 Reis','1 Crônicas','2 Crônicas','Esdras','Neemias',
+  'Ester','Jó','Salmos','Provérbios','Eclesiastes','Cânticos','Isaías','Jeremias',
+  'Lamentações','Ezequiel','Daniel','Oséias','Joel','Amós','Obadias','Jonas','Miquéias',
+  'Naum','Habacuque','Sofonias','Ageu','Zacarias','Malaquias','Mateus','Marcos','Lucas',
+  'João','Atos','Romanos','1 Coríntios','2 Coríntios','Gálatas','Efésios','Filipenses',
+  'Colossenses','1 Tessalonicenses','2 Tessalonicenses','1 Timóteo','2 Timóteo','Tito',
+  'Filemom','Hebreus','Tiago','1 Pedro','2 Pedro','1 João','2 João','3 João','Judas','Apocalipse',
+];
+
+type PalavraDoDia = { translation: string; book: number; chapter: number; verse: number; text: string };
+
 export function Home() {
   const { events, leaders, members, ministries, studies, songs, membrosIgreja } = useMockData();
   const { user } = useAuth();
   const { activeIgreja } = useActiveChurch();
   const navigate = useNavigate();
+
+  const [palavraDoDia, setPalavraDoDia] = useState<PalavraDoDia | null>(null);
+
+  useEffect(() => {
+    fetch(`${API_BASE}/bible/palavra-do-dia`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => data && setPalavraDoDia(data))
+      .catch(() => {});
+  }, []);
 
   const today = new Date();
   const upcomingEvents = events
@@ -34,6 +59,23 @@ export function Home() {
         </h1>
         <p className="text-muted-foreground mt-1">Bem-vindo ao Nivah. Aqui está um resumo do sistema.</p>
       </div>
+
+      {/* Palavra do dia */}
+      {palavraDoDia && (
+        <Card className="p-5 bg-primary/5 border-primary/20">
+          <div className="flex items-center gap-2 mb-3">
+            <BookOpen className="w-4 h-4 text-primary" />
+            <span className="text-xs font-semibold text-primary uppercase tracking-wider">Palavra do dia</span>
+          </div>
+          <p className="text-foreground leading-relaxed italic text-[15px]">
+            "{palavraDoDia.text}"
+          </p>
+          <p className="mt-2 text-sm font-medium text-muted-foreground">
+            {BOOK_NAMES[palavraDoDia.book - 1]} {palavraDoDia.chapter}:{palavraDoDia.verse}
+            <span className="ml-1 text-xs">({palavraDoDia.translation})</span>
+          </p>
+        </Card>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
