@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight, BookOpen, Search, Copy, Check, Loader2, Bookmark, X, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, BookOpen, Search, Copy, Check, Loader2, Bookmark, X, Trash2, CheckSquare } from 'lucide-react';
 import { toast } from 'sonner';
 
 const API_BASE = (import.meta.env.VITE_API_URL ?? 'http://localhost:8080') + '/api';
@@ -162,7 +162,7 @@ export function Biblia() {
   const [showBooks, setShowBooks] = useState(false);
   const [highlights, setHighlights] = useState<Highlight[]>(loadHighlights);
   const [showHighlights, setShowHighlights] = useState(false);
-  const [colorPickerVerse, setColorPickerVerse] = useState<number | null>(null);
+  const [selectedVerses, setSelectedVerses] = useState<Set<number>>(new Set());
   const topRef = useRef<HTMLDivElement>(null);
 
   // Sincroniza destaques do backend na montagem
@@ -218,6 +218,7 @@ export function Biblia() {
     setChapter(ch);
     setShowBooks(false);
     setShowHighlights(false);
+    setSelectedVerses(new Set());
   };
 
   const prevChapter = () => {
@@ -322,7 +323,6 @@ export function Biblia() {
       saveHighlights(next);
       return next;
     });
-    setColorPickerVerse(null);
   };
 
   const removeHighlight = (id: string) => {
@@ -337,7 +337,6 @@ export function Biblia() {
       saveHighlights(next);
       return next;
     });
-    setColorPickerVerse(null);
   };
 
   const clearAllHighlights = () => {
@@ -345,6 +344,32 @@ export function Biblia() {
     saveHighlights([]);
     toast.success('Marcações removidas.');
   };
+
+  const toggleVerseSelection = (verseNum: number) => {
+    setSelectedVerses(prev => {
+      const next = new Set(prev);
+      next.has(verseNum) ? next.delete(verseNum) : next.add(verseNum);
+      return next;
+    });
+  };
+
+  const applyColorToSelected = (colorId: string) => {
+    verses
+      .filter(v => selectedVerses.has(v.verse))
+      .forEach(v => markVerse(v, colorId));
+    setSelectedVerses(new Set());
+  };
+
+  const removeSelectedHighlights = () => {
+    selectedVerses.forEach(verseNum => {
+      const id = `${translation}-${bookIndex}-${chapter}-${verseNum}`;
+      removeHighlight(id);
+    });
+    setSelectedVerses(new Set());
+  };
+
+  const allSelectedHighlighted = selectedVerses.size > 0 &&
+    [...selectedVerses].every(vn => highlights.some(h => h.id === `${translation}-${bookIndex}-${chapter}-${vn}`));
 
   const isFirst = bookIndex === 0 && chapter === 1;
   const isLast = bookIndex === BOOKS.length - 1 && chapter === book.chapters;
@@ -541,8 +566,7 @@ export function Biblia() {
 
           {highlights.length === 0 ? (
             <div className="px-4 py-10 text-center text-sm text-amber-700/60 dark:text-amber-500/60">
-              Nenhum versículo marcado ainda. Clique no{' '}
-              <Bookmark className="w-3.5 h-3.5 inline" /> ao lado de um versículo para marcar.
+              Nenhum versículo marcado ainda. Toque em um versículo para selecioná-lo e escolha uma cor.
             </div>
           ) : (
             <div className="divide-y divide-amber-200/60 dark:divide-amber-800/60 max-h-96 overflow-y-auto">
@@ -618,74 +642,54 @@ export function Biblia() {
               {verses.map(v => {
                 const hl = getHighlight(v);
                 const hlColor = hl ? HIGHLIGHT_COLORS.find(c => c.id === hl.color) ?? HIGHLIGHT_COLORS[0] : null;
-                const pickerOpen = colorPickerVerse === v.verse;
+                const selected = selectedVerses.has(v.verse);
                 return (
                   <div
                     key={v.verse}
-                    className="group relative flex items-start gap-3 py-2 px-3 rounded-lg transition-colors hover:bg-muted/30"
-                    style={hlColor ? { backgroundColor: hlColor.bg } : undefined}
+                    onClick={() => toggleVerseSelection(v.verse)}
+                    className={`group relative flex items-start gap-3 py-2.5 px-3 rounded-lg transition-colors cursor-pointer select-none ${
+                      selected
+                        ? 'ring-2 ring-primary/40 bg-primary/5'
+                        : 'hover:bg-muted/30'
+                    }`}
+                    style={!selected && hlColor ? { backgroundColor: hlColor.bg } : undefined}
                   >
-                    <span className="text-xs font-bold text-primary/60 mt-0.5 w-6 shrink-0 text-right select-none">
-                      {v.verse}
-                    </span>
+                    {/* Indicador de seleção / número do versículo */}
+                    <div className="w-6 shrink-0 flex justify-end mt-0.5">
+                      {selected ? (
+                        <div className="w-4 h-4 rounded-full bg-primary flex items-center justify-center">
+                          <Check className="w-2.5 h-2.5 text-primary-foreground" />
+                        </div>
+                      ) : (
+                        <span className="text-xs font-bold text-primary/60">
+                          {v.verse}
+                        </span>
+                      )}
+                    </div>
+
                     <p className="text-foreground leading-relaxed flex-1 text-[15px]">
                       {v.text}
                     </p>
-                    <div className={`shrink-0 flex items-center gap-0.5 transition-opacity ${hl || pickerOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-                      <button
-                        onClick={() => setColorPickerVerse(pickerOpen ? null : v.verse)}
-                        className="p-1 rounded transition-colors text-muted-foreground hover:bg-accent"
-                        title={hl ? 'Alterar marcação' : 'Marcar versículo'}
-                      >
-                        <Bookmark
-                          className="w-3.5 h-3.5"
-                          style={hlColor ? { fill: hlColor.swatch, color: hlColor.swatch } : undefined}
-                        />
-                      </button>
-                      <button
-                        onClick={() => copyVerse(v)}
-                        className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-                        title="Copiar versículo"
-                      >
-                        {copiedVerse === v.verse
-                          ? <Check className="w-3.5 h-3.5 text-green-500" />
-                          : <Copy className="w-3.5 h-3.5" />
-                        }
-                      </button>
-                    </div>
 
-                    {/* Color picker popover */}
-                    {pickerOpen && (
-                      <>
-                        <div
-                          className="fixed inset-0 z-10"
-                          onClick={() => setColorPickerVerse(null)}
-                        />
-                        <div className="absolute right-0 top-8 z-20 flex items-center gap-1.5 px-2.5 py-2 rounded-lg border border-border bg-popover shadow-md">
-                          {HIGHLIGHT_COLORS.map(c => (
-                            <button
-                              key={c.id}
-                              onClick={() => markVerse(v, c.id)}
-                              title={c.label}
-                              className="w-6 h-6 rounded-full border-2 transition-transform hover:scale-110 focus:outline-none"
-                              style={{
-                                backgroundColor: c.swatch,
-                                borderColor: hl?.color === c.id ? '#000' : 'transparent',
-                              }}
-                            />
-                          ))}
-                          {hl && (
-                            <button
-                              onClick={() => removeHighlight(hl.id)}
-                              className="ml-1 p-1 rounded text-muted-foreground hover:text-destructive hover:bg-accent transition-colors"
-                              title="Remover marcação"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </div>
-                      </>
+                    {/* Bookmark indicator (não clicável, só visual) */}
+                    {hl && !selected && (
+                      <Bookmark
+                        className="w-3.5 h-3.5 shrink-0 mt-0.5"
+                        style={{ fill: hlColor!.swatch, color: hlColor!.swatch }}
+                      />
                     )}
+
+                    {/* Botão copiar (aparece no hover, não interfere na seleção) */}
+                    <button
+                      onClick={e => { e.stopPropagation(); copyVerse(v); }}
+                      className="shrink-0 p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-all opacity-0 group-hover:opacity-100 mt-0.5"
+                      title="Copiar versículo"
+                    >
+                      {copiedVerse === v.verse
+                        ? <Check className="w-3.5 h-3.5 text-green-500" />
+                        : <Copy className="w-3.5 h-3.5" />
+                      }
+                    </button>
                   </div>
                 );
               })}
@@ -720,6 +724,55 @@ export function Biblia() {
           </div>
         )}
       </div>
+      {/* Barra flutuante de multi-seleção */}
+      {selectedVerses.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 rounded-2xl bg-popover border border-border shadow-2xl">
+          <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+            <CheckSquare className="w-4 h-4 text-primary" />
+            <span>{selectedVerses.size} {selectedVerses.size === 1 ? 'versículo' : 'versículos'}</span>
+          </div>
+
+          <div className="w-px h-5 bg-border" />
+
+          {/* Swatches de cor */}
+          <div className="flex items-center gap-1.5">
+            {HIGHLIGHT_COLORS.map(c => (
+              <button
+                key={c.id}
+                onClick={() => applyColorToSelected(c.id)}
+                title={`Marcar com ${c.label}`}
+                className="w-6 h-6 rounded-full border-2 border-transparent transition-transform hover:scale-125 focus:outline-none hover:border-foreground/30"
+                style={{ backgroundColor: c.swatch }}
+              />
+            ))}
+          </div>
+
+          {/* Remover (só aparece se todos os selecionados já estão marcados) */}
+          {allSelectedHighlighted && (
+            <>
+              <div className="w-px h-5 bg-border" />
+              <button
+                onClick={removeSelectedHighlights}
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors"
+                title="Remover marcação"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Remover
+              </button>
+            </>
+          )}
+
+          <div className="w-px h-5 bg-border" />
+
+          <button
+            onClick={() => setSelectedVerses(new Set())}
+            className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            title="Cancelar seleção"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
