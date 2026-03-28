@@ -148,6 +148,20 @@ public class BibleController {
         return ResponseEntity.noContent().build();
     }
 
+    @DeleteMapping("/highlights")
+    public ResponseEntity<?> deleteHighlightByRef(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam String translation,
+            @RequestParam int bookIndex,
+            @RequestParam int chapter,
+            @RequestParam int verse) {
+
+        User user = findUser(userDetails);
+        bibleHighlightRepository.deleteByUserIdAndTranslationAndBookIndexAndChapterAndVerse(
+            user.getId(), translation.toLowerCase(), bookIndex, chapter, verse);
+        return ResponseEntity.noContent().build();
+    }
+
     // -------------------------------------------------------------------------
     // Seed (admin)
     // -------------------------------------------------------------------------

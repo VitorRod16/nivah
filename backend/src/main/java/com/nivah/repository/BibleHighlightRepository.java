@@ -11,4 +11,7 @@ public interface BibleHighlightRepository extends JpaRepository<BibleHighlight, 
     List<BibleHighlight> findByUserId(UUID userId);
 
     void deleteByIdAndUserId(UUID id, UUID userId);
+
+    void deleteByUserIdAndTranslationAndBookIndexAndChapterAndVerse(
+        UUID userId, String translation, int bookIndex, int chapter, int verse);
 }

@@ -332,8 +332,14 @@ export function Biblia() {
 
   const removeHighlight = (id: string) => {
     const hl = highlights.find(h => h.id === id);
-    if (hl?.serverId && isLoggedIn()) {
-      fetch(`${API_BASE_URL}/bible/highlights/${hl.serverId}`, {
+    if (hl && isLoggedIn()) {
+      const params = new URLSearchParams({
+        translation: hl.translation,
+        bookIndex:   String(hl.bookIndex),
+        chapter:     String(hl.chapter),
+        verse:       String(hl.verse),
+      });
+      fetch(`${API_BASE_URL}/bible/highlights?${params}`, {
         method: 'DELETE', headers: authHeaders(),
       }).catch(() => {});
     }
